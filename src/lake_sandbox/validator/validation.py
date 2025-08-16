@@ -80,7 +80,8 @@ def validate(
     if target in ["delta", "both"]:
         results["delta"] = validate_delta_tables(
             delta_dir=delta_dir,
-            verbose=verbose
+            verbose=verbose,
+            organized_dir=organized_dir
         )
 
     # Overall summary

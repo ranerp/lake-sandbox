@@ -92,7 +92,8 @@ def validation_resource(
         if target in ["delta", "both"]:
             delta_result = validate_delta_tables(
                 delta_dir=delta_dir,
-                verbose=False
+                verbose=False,
+                organized_dir=organized_dir
             )
             validation_results["delta"] = {
                 "valid": delta_result.valid,
