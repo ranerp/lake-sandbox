@@ -4,7 +4,7 @@ import duckdb
 import typer
 
 from lake_sandbox.utils.performance import monitor_performance
-from lake_sandbox.validator.models import ReorganizationProgress, ChunkFile
+from lake_sandbox.validator.models import ChunkFile, ReorganizationProgress
 
 
 @monitor_performance()

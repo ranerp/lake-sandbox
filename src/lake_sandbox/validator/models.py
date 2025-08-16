@@ -1,5 +1,4 @@
 from dataclasses import dataclass
-from typing import Optional
 
 
 @dataclass
@@ -34,8 +33,8 @@ class RawValidationResult:
     total_unique_parcels: int
     total_records: int
     issues: list[str]
-    parcel_distribution: Optional[ParcelDistribution] = None
-    error: Optional[str] = None
+    parcel_distribution: ParcelDistribution | None = None
+    error: str | None = None
 
 
 @dataclass
@@ -59,7 +58,7 @@ class OrganizedValidationResult:
     total_unique_parcels: int
     total_records: int
     issues: list[str]
-    error: Optional[str] = None
+    error: str | None = None
 
 
 @dataclass
@@ -85,7 +84,7 @@ class DeltaValidationResult:
     total_unique_parcels: int
     total_records: int
     issues: list[str]
-    error: Optional[str] = None
+    error: str | None = None
 
 
 @dataclass
@@ -103,7 +102,7 @@ class ReorganizationProgress:
     chunk_files: list[ChunkFile]
 
 
-@dataclass  
+@dataclass
 class DeltaTableInfo:
     """Information about a Delta table."""
     chunk_id: str

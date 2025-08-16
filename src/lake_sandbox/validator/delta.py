@@ -59,7 +59,7 @@ def validate_delta_tables(
     conn = duckdb.connect()
     table_details: list[TableDetail] = []
     issues: list[str] = []
-    
+
     unique_parcels_overall: set[str] = set()
     expected_date_ranges: dict[tuple[str, str], list[str]] = {}
     total_records = 0

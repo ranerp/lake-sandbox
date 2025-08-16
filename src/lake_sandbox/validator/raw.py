@@ -4,7 +4,11 @@ import duckdb
 import typer
 
 from lake_sandbox.utils.performance import monitor_performance
-from lake_sandbox.validator.models import RawValidationResult, FileDetail, ParcelDistribution
+from lake_sandbox.validator.models import (
+    FileDetail,
+    ParcelDistribution,
+    RawValidationResult,
+)
 
 
 @monitor_performance()
@@ -137,13 +141,11 @@ def validate_raw_timeseries(
     conn.close()
 
     total_unique_parcels = len(unique_parcels_overall)
-    valid = True
 
     # Check if we have the expected number of total unique parcels
     if total_unique_parcels != expected_total_parcels:
         issue = f"Total unique parcels mismatch: expected {expected_total_parcels:,}, found {total_unique_parcels:,}"
         issues.append(issue)
-        valid = False
 
     # Check parcel count consistency across files
     parcel_distribution = None
@@ -176,8 +178,7 @@ def validate_raw_timeseries(
             f"Parcels per file: {parcel_distribution.min_parcels_per_file:,} - {parcel_distribution.max_parcels_per_file:,} (avg: {parcel_distribution.avg_parcels_per_file:,})")
 
     # Determine overall validity
-    if issues:
-        valid = False
+    valid = len(issues) == 0
 
     if valid:
         typer.echo("✓ Raw timeseries data is valid!")

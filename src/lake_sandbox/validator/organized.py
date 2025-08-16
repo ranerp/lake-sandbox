@@ -4,7 +4,7 @@ import duckdb
 import typer
 
 from lake_sandbox.utils.performance import monitor_performance
-from lake_sandbox.validator.models import OrganizedValidationResult, ChunkDetail
+from lake_sandbox.validator.models import ChunkDetail, OrganizedValidationResult
 
 
 @monitor_performance()
@@ -64,7 +64,7 @@ def validate_organized_chunks(
     conn = duckdb.connect()
     chunk_details: list[ChunkDetail] = []
     issues: list[str] = []
-    
+
     unique_parcels_overall: set[str] = set()
     total_records = 0
 
@@ -129,7 +129,7 @@ def validate_organized_chunks(
             if unique_parcels > expected_chunk_size:
                 issue = f"{chunk_name}: Too many parcels ({unique_parcels} > {expected_chunk_size})"
                 issues.append(issue)
-    
+
             # Check for parcel overlaps between chunks
             chunk_parcels = set(conn.execute(
                 f"SELECT DISTINCT parcel_id FROM read_parquet('{data_file}')").fetchall())
