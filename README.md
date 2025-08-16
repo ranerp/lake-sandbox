@@ -274,7 +274,7 @@ uv run lake-sandbox pipeline \
 | **Total Pipeline** | **17.0 min** | **2.2 GB** | **149%** | **20.1 GB** |
 
 **Key Insights:**
-- **67% compression**: Delta Lake (5.1 GB) vs raw parquet (15 GB)
+- **67% deduplication**: Delta Lake (5.1 GB) vs organized chunks (15 GB) due to removing duplicates
 - **Memory efficiency**: Peak usage only 2.2 GB for 159M records
 - **CPU utilization**: Excellent multi-core performance (>100% indicates parallel processing)
 - **Validation speed**: Cross-validation of 100 partitions in 15 seconds
@@ -282,8 +282,8 @@ uv run lake-sandbox pipeline \
 **Storage Breakdown:**
 ```
 output/timeseries-raw/        15G  (Raw parquet files)
-output/timeseries-organized/  15G  (Reorganized chunks)  
-output/timeseries-delta/     5.1G  (Partitioned Delta Lake)
+output/timeseries-organized/  15G  (Reorganized chunks with possibleduplicates)  
+output/timeseries-delta/     5.1G  (Deduplicated partitioned Delta table)
 ```
 
 Example detailed output:
