@@ -91,8 +91,8 @@ def validate(
             if not delta_valid:
                 typer.echo("  • Delta tables have issues")
     elif target == "raw":
-        raw_valid = results.get("raw", {}).get("valid", False)
-        if raw_valid:
+        raw_result = results.get("raw")
+        if raw_result and raw_result.valid:
             typer.echo("\n✓ Raw timeseries validation passed!")
         else:
             typer.echo("\n✗ Raw timeseries validation failed!")
