@@ -79,8 +79,10 @@ def validate(
     # Overall summary
     if target == "both":
         typer.echo("\n=== OVERALL SUMMARY ===")
-        organized_valid = results.get("organized", {}).get("valid", False)
-        delta_valid = results.get("delta", {}).get("valid", False)
+        organized_result = results.get("organized")
+        delta_result = results.get("delta")
+        organized_valid = organized_result.valid if organized_result else False
+        delta_valid = delta_result.valid if delta_result else False
 
         if organized_valid and delta_valid:
             typer.echo("✓ All validations passed!")

@@ -86,3 +86,35 @@ class DeltaValidationResult:
     total_records: int
     issues: list[str]
     error: Optional[str] = None
+
+
+@dataclass
+class ChunkFile:
+    """Information about a reorganized chunk file."""
+    chunk_id: str
+    file_path: str
+    row_count: int
+
+
+@dataclass
+class ReorganizationProgress:
+    """Progress tracking for reorganization phase."""
+    existing_chunks: int
+    chunk_files: list[ChunkFile]
+
+
+@dataclass  
+class DeltaTableInfo:
+    """Information about a Delta table."""
+    chunk_id: str
+    path: str
+    version: int
+    file_count: int
+
+
+@dataclass
+class DeltaConversionProgress:
+    """Progress tracking for Delta conversion phase."""
+    total_chunks: int
+    existing_delta_tables: int
+    delta_tables: list[DeltaTableInfo]

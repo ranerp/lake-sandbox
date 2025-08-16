@@ -5,6 +5,7 @@ import typer
 from deltalake import DeltaTable, write_deltalake
 
 from lake_sandbox.utils.performance import monitor_performance
+from lake_sandbox.validator.models import DeltaConversionProgress, DeltaTableInfo
 
 
 @monitor_performance()
@@ -150,7 +151,7 @@ def convert_to_delta_lake(
     return stats
 
 
-def get_delta_conversion_progress(input_dir: str, delta_dir: str) -> dict[str, int | list[dict[str, str | int]]]:
+def get_delta_conversion_progress(input_dir: str, delta_dir: str) -> DeltaConversionProgress:
     """Check progress of Delta conversion by comparing parquet chunks to Delta tables.
 
     Args:
@@ -164,7 +165,7 @@ def get_delta_conversion_progress(input_dir: str, delta_dir: str) -> dict[str, i
     delta_path = Path(delta_dir)
 
     if not input_path.exists():
-        return {"total_chunks": 0, "existing_delta_tables": 0, "delta_tables": []}
+        return DeltaConversionProgress(total_chunks=0, existing_delta_tables=0, delta_tables=[])
 
     # Count total parcel chunks available for conversion
     chunk_dirs = [d for d in input_path.iterdir() if
@@ -172,37 +173,36 @@ def get_delta_conversion_progress(input_dir: str, delta_dir: str) -> dict[str, i
     total_chunks = len(chunk_dirs)
 
     if not delta_path.exists():
-        return {"total_chunks": total_chunks, "existing_delta_tables": 0,
-                "delta_tables": []}
+        return DeltaConversionProgress(total_chunks=total_chunks, existing_delta_tables=0, delta_tables=[])
 
     # Count existing valid Delta tables
     delta_dirs = [d for d in delta_path.iterdir() if
                   d.is_dir() and d.name.startswith("parcel_chunk=")]
-    valid_delta_tables = []
+    valid_delta_tables: list[DeltaTableInfo] = []
 
-    for delta_dir in sorted(delta_dirs):
+    for delta_table_dir in sorted(delta_dirs):
         try:
             # Verify Delta table is valid
-            dt = DeltaTable(str(delta_dir))
+            dt = DeltaTable(str(delta_table_dir))
             version = dt.version()
             file_count = len(dt.files())
 
             if file_count > 0:
-                valid_delta_tables.append({
-                    "chunk_id": delta_dir.name,
-                    "path": str(delta_dir),
-                    "version": version,
-                    "file_count": file_count
-                })
+                valid_delta_tables.append(DeltaTableInfo(
+                    chunk_id=delta_table_dir.name,
+                    path=str(delta_table_dir),
+                    version=version,
+                    file_count=file_count
+                ))
         except Exception:
             # Directory exists but is not a valid Delta table
             pass
 
-    return {
-        "total_chunks": total_chunks,
-        "existing_delta_tables": len(valid_delta_tables),
-        "delta_tables": valid_delta_tables
-    }
+    return DeltaConversionProgress(
+        total_chunks=total_chunks,
+        existing_delta_tables=len(valid_delta_tables),
+        delta_tables=valid_delta_tables
+    )
 
 
 def optimize_delta_table(delta_table_path: str, dry_run: bool = False) -> bool:

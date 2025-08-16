@@ -1,18 +1,18 @@
 from pathlib import Path
-from typing import Any, cast
 
 import duckdb
 import typer
 from deltalake import DeltaTable
 
 from lake_sandbox.utils.performance import monitor_performance
+from lake_sandbox.validator.models import DeltaValidationResult, TableDetail
 
 
 @monitor_performance()
 def validate_delta_tables(
     delta_dir: str,
     verbose: bool = False,
-) -> dict[str, Any]:
+) -> DeltaValidationResult:
     """Validate Delta tables contain complete timeseries data for each parcel.
 
     Args:
@@ -29,29 +29,40 @@ def validate_delta_tables(
     delta_path = Path(delta_dir)
     if not delta_path.exists():
         typer.echo(f"Error: Directory {delta_dir} does not exist")
-        return {"valid": False, "error": "Directory not found"}
+        return DeltaValidationResult(
+            valid=False,
+            total_tables=0,
+            table_details=[],
+            total_unique_parcels=0,
+            total_records=0,
+            issues=[],
+            error="Directory not found"
+        )
 
     # Find all Delta table directories
     delta_dirs = [d for d in delta_path.iterdir() if
                   d.is_dir() and d.name.startswith("parcel_chunk=")]
     if not delta_dirs:
         typer.echo("Error: No Delta table directories found")
-        return {"valid": False, "error": "No Delta tables found"}
+        return DeltaValidationResult(
+            valid=False,
+            total_tables=0,
+            table_details=[],
+            total_unique_parcels=0,
+            total_records=0,
+            issues=[],
+            error="No Delta tables found"
+        )
 
     typer.echo(f"Found {len(delta_dirs)} Delta tables")
 
     conn = duckdb.connect()
-    validation_results = {
-        "valid": True,
-        "total_tables": len(delta_dirs),
-        "table_details": [],
-        "total_unique_parcels": 0,
-        "total_records": 0,
-        "issues": []
-    }
-
+    table_details: list[TableDetail] = []
+    issues: list[str] = []
+    
     unique_parcels_overall: set[str] = set()
     expected_date_ranges: dict[tuple[str, str], list[str]] = {}
+    total_records = 0
 
     for delta_table_dir in sorted(delta_dirs):
         table_name = delta_table_dir.name
@@ -64,8 +75,7 @@ def validate_delta_tables(
 
             if file_count == 0:
                 issue = f"{table_name}: No data files"
-                cast(list[str], validation_results["issues"]).append(issue)
-                validation_results["valid"] = False
+                issues.append(issue)
                 if verbose:
                     typer.echo(f"  ✗ {issue}")
                 continue
@@ -92,32 +102,33 @@ def validate_delta_tables(
             result = conn.execute(stats_query).fetchone()
             if result is None:
                 raise ValueError("Query returned no results")
-            total_records, unique_parcels, unique_dates, min_date, max_date, unique_combinations = result
+            table_total_records, unique_parcels, unique_dates, min_date, max_date, unique_combinations = result
 
             # Check for missing dates per parcel (should be unique_parcels * unique_dates = unique_combinations)
             expected_combinations = unique_parcels * unique_dates
             missing_combinations = expected_combinations - unique_combinations
 
-            table_detail = {
-                "table_name": table_name,
-                "version": version,
-                "file_count": file_count,
-                "total_records": total_records,
-                "unique_parcels": unique_parcels,
-                "unique_dates": unique_dates,
-                "date_range": f"{min_date} to {max_date}",
-                "missing_combinations": missing_combinations,
-                "completeness_pct": (
-                        unique_combinations / expected_combinations * 100) if expected_combinations > 0 else 0
-            }
+            completeness_pct = (unique_combinations / expected_combinations * 100) if expected_combinations > 0 else 0
 
-            cast(list[dict[str, Any]], validation_results["table_details"]).append(table_detail)
-            validation_results["total_records"] += total_records
+            table_detail = TableDetail(
+                table_name=table_name,
+                version=version,
+                file_count=file_count,
+                total_records=table_total_records,
+                unique_parcels=unique_parcels,
+                unique_dates=unique_dates,
+                date_range=f"{min_date} to {max_date}",
+                missing_combinations=missing_combinations,
+                completeness_pct=completeness_pct
+            )
+
+            table_details.append(table_detail)
+            total_records += table_total_records
 
             # Check for missing dates
             if missing_combinations > 0:
-                issue = f"{table_name}: Missing {missing_combinations:,} parcel-date combinations ({table_detail['completeness_pct']:.1f}% complete)"
-                cast(list[str], validation_results["issues"]).append(issue)
+                issue = f"{table_name}: Missing {missing_combinations:,} parcel-date combinations ({completeness_pct:.1f}% complete)"
+                issues.append(issue)
                 # Don't mark as invalid for missing combinations - this might be expected
 
             # Check for parcel overlaps between tables
@@ -128,8 +139,7 @@ def validate_delta_tables(
             overlap = unique_parcels_overall.intersection(table_parcels)
             if overlap:
                 issue = f"{table_name}: Parcel overlap with other tables ({len(overlap)} parcels)"
-                cast(list[str], validation_results["issues"]).append(issue)
-                validation_results["valid"] = False
+                issues.append(issue)
                 if verbose:
                     typer.echo(f"  ⚠ Overlapping parcels: {list(overlap)[:5]}...")
 
@@ -143,36 +153,45 @@ def validate_delta_tables(
 
             if verbose:
                 typer.echo(
-                    f"  ✓ {table_name}: {unique_parcels:,} parcels, {unique_dates} dates, {total_records:,} records ({table_detail['completeness_pct']:.1f}% complete)")
+                    f"  ✓ {table_name}: {unique_parcels:,} parcels, {unique_dates} dates, {table_total_records:,} records ({completeness_pct:.1f}% complete)")
 
         except Exception as e:
             issue = f"{table_name}: Failed to read ({e})"
-            validation_results["issues"].append(issue)
-            validation_results["valid"] = False
+            issues.append(issue)
             if verbose:
                 typer.echo(f"  ✗ {issue}")
 
     conn.close()
 
-    validation_results["total_unique_parcels"] = len(unique_parcels_overall)
+    total_unique_parcels = len(unique_parcels_overall)
 
     # Check date range consistency
     if len(expected_date_ranges) > 1:
         issue = f"Inconsistent date ranges across tables: {list(expected_date_ranges.keys())}"
-        validation_results["issues"].append(issue)
+        issues.append(issue)
         typer.echo(f"  ⚠ {issue}")
 
     # Summary
     typer.echo("\n=== VALIDATION SUMMARY ===")
-    typer.echo(f"Total Delta tables: {validation_results['total_tables']}")
-    typer.echo(f"Total unique parcels: {validation_results['total_unique_parcels']:,}")
-    typer.echo(f"Total records: {validation_results['total_records']:,}")
+    typer.echo(f"Total Delta tables: {len(delta_dirs)}")
+    typer.echo(f"Total unique parcels: {total_unique_parcels:,}")
+    typer.echo(f"Total records: {total_records:,}")
 
-    if validation_results["valid"]:
+    # Determine overall validity - overlapping parcels are the main validation failure
+    valid = not any("overlap" in issue.lower() for issue in issues)
+
+    if valid:
         typer.echo("✓ All Delta tables are valid!")
     else:
-        typer.echo(f"✗ Found {len(cast(list[str], validation_results['issues']))} issues:")
-        for issue in cast(list[str], validation_results["issues"]):
+        typer.echo(f"✗ Found {len(issues)} issues:")
+        for issue in issues:
             typer.echo(f"  • {issue}")
 
-    return validation_results
+    return DeltaValidationResult(
+        valid=valid,
+        total_tables=len(delta_dirs),
+        table_details=table_details,
+        total_unique_parcels=total_unique_parcels,
+        total_records=total_records,
+        issues=issues
+    )

@@ -1,10 +1,10 @@
 from pathlib import Path
-from typing import Any, cast
 
 import duckdb
 import typer
 
 from lake_sandbox.utils.performance import monitor_performance
+from lake_sandbox.validator.models import OrganizedValidationResult, ChunkDetail
 
 
 @monitor_performance()
@@ -13,7 +13,7 @@ def validate_organized_chunks(
     expected_chunk_size: int,
     expected_tiles: int,
     verbose: bool = False,
-) -> dict[str, Any]:
+) -> OrganizedValidationResult:
     """Validate organized parcel chunks have correct structure and parcel counts.
 
     Args:
@@ -34,28 +34,39 @@ def validate_organized_chunks(
     organized_path = Path(organized_dir)
     if not organized_path.exists():
         typer.echo(f"Error: Directory {organized_dir} does not exist")
-        return {"valid": False, "error": "Directory not found"}
+        return OrganizedValidationResult(
+            valid=False,
+            total_chunks=0,
+            chunk_details=[],
+            total_unique_parcels=0,
+            total_records=0,
+            issues=[],
+            error="Directory not found"
+        )
 
     # Find all parcel chunk directories
     chunk_dirs = [d for d in organized_path.iterdir() if
                   d.is_dir() and d.name.startswith("parcel_chunk=")]
     if not chunk_dirs:
         typer.echo("Error: No parcel_chunk directories found")
-        return {"valid": False, "error": "No chunks found"}
+        return OrganizedValidationResult(
+            valid=False,
+            total_chunks=0,
+            chunk_details=[],
+            total_unique_parcels=0,
+            total_records=0,
+            issues=[],
+            error="No chunks found"
+        )
 
     typer.echo(f"Found {len(chunk_dirs)} parcel chunks")
 
     conn = duckdb.connect()
-    validation_results = {
-        "valid": True,
-        "total_chunks": len(chunk_dirs),
-        "chunk_details": [],
-        "total_unique_parcels": 0,
-        "total_records": 0,
-        "issues": []
-    }
-
+    chunk_details: list[ChunkDetail] = []
+    issues: list[str] = []
+    
     unique_parcels_overall: set[str] = set()
+    total_records = 0
 
     for chunk_dir in sorted(chunk_dirs):
         chunk_name = chunk_dir.name
@@ -63,8 +74,7 @@ def validate_organized_chunks(
 
         if not data_file.exists():
             issue = f"Missing data.parquet in {chunk_name}"
-            cast(list[str], validation_results["issues"]).append(issue)
-            validation_results["valid"] = False
+            issues.append(issue)
             if verbose:
                 typer.echo(f"  ✗ {issue}")
             continue
@@ -92,25 +102,25 @@ def validate_organized_chunks(
             result = conn.execute(stats_query).fetchone()
             if result is None:
                 raise ValueError("Query returned no results")
-            total_records, unique_parcels, unique_dates, min_date, max_date, duplicates = result
+            chunk_total_records, unique_parcels, unique_dates, min_date, max_date, duplicates = result
 
             # Get sample parcel IDs to check for overlaps
             sample_parcels_query = f"SELECT DISTINCT parcel_id FROM read_parquet('{data_file}') LIMIT 10"
             sample_parcels = [row[0] for row in
                               conn.execute(sample_parcels_query).fetchall()]
 
-            chunk_detail = {
-                "chunk_name": chunk_name,
-                "total_records": total_records,
-                "unique_parcels": unique_parcels,
-                "unique_dates": unique_dates,
-                "date_range": f"{min_date} to {max_date}",
-                "duplicate_records": duplicates,
-                "sample_parcels": sample_parcels[:5]  # First 5 for display
-            }
+            chunk_detail = ChunkDetail(
+                chunk_name=chunk_name,
+                total_records=chunk_total_records,
+                unique_parcels=unique_parcels,
+                unique_dates=unique_dates,
+                date_range=f"{min_date} to {max_date}",
+                duplicate_records=duplicates,
+                sample_parcels=sample_parcels[:5]  # First 5 for display
+            )
 
-            cast(list[dict[str, Any]], validation_results["chunk_details"]).append(chunk_detail)
-            validation_results["total_records"] += total_records
+            chunk_details.append(chunk_detail)
+            total_records += chunk_total_records
 
             # Check for expected duplicates based on tiles
             expected_duplicates = unique_parcels * unique_dates * (expected_tiles - 1)
@@ -118,9 +128,8 @@ def validate_organized_chunks(
             # Check chunk size expectations
             if unique_parcels > expected_chunk_size:
                 issue = f"{chunk_name}: Too many parcels ({unique_parcels} > {expected_chunk_size})"
-                cast(list[str], validation_results["issues"]).append(issue)
-                validation_results["valid"] = False
-
+                issues.append(issue)
+    
             # Check for parcel overlaps between chunks
             chunk_parcels = set(conn.execute(
                 f"SELECT DISTINCT parcel_id FROM read_parquet('{data_file}')").fetchall())
@@ -129,8 +138,7 @@ def validate_organized_chunks(
             overlap = unique_parcels_overall.intersection(chunk_parcels)
             if overlap:
                 issue = f"{chunk_name}: Parcel overlap with other chunks ({len(overlap)} parcels)"
-                cast(list[str], validation_results["issues"]).append(issue)
-                validation_results["valid"] = False
+                issues.append(issue)
                 if verbose:
                     typer.echo(f"  ⚠ Overlapping parcels: {list(overlap)[:5]}...")
 
@@ -138,33 +146,42 @@ def validate_organized_chunks(
 
             if verbose:
                 typer.echo(
-                    f"  ✓ {chunk_name}: {unique_parcels:,} parcels, {unique_dates} dates, {total_records:,} records")
+                    f"  ✓ {chunk_name}: {unique_parcels:,} parcels, {unique_dates} dates, {chunk_total_records:,} records")
                 if duplicates > 0:
                     typer.echo(
                         f"    • {duplicates:,} duplicate records (expected ~{expected_duplicates:,} from {expected_tiles} tiles)")
 
         except Exception as e:
             issue = f"{chunk_name}: Failed to read ({e})"
-            cast(list[str], validation_results["issues"]).append(issue)
-            validation_results["valid"] = False
+            issues.append(issue)
             if verbose:
                 typer.echo(f"  ✗ {issue}")
 
     conn.close()
 
-    validation_results["total_unique_parcels"] = len(unique_parcels_overall)
+    total_unique_parcels = len(unique_parcels_overall)
 
     # Summary
     typer.echo("\n=== VALIDATION SUMMARY ===")
-    typer.echo(f"Total chunks: {validation_results['total_chunks']}")
-    typer.echo(f"Total unique parcels: {validation_results['total_unique_parcels']:,}")
-    typer.echo(f"Total records: {validation_results['total_records']:,}")
+    typer.echo(f"Total chunks: {len(chunk_dirs)}")
+    typer.echo(f"Total unique parcels: {total_unique_parcels:,}")
+    typer.echo(f"Total records: {total_records:,}")
 
-    if validation_results["valid"]:
+    # Determine overall validity
+    valid = len(issues) == 0
+
+    if valid:
         typer.echo("✓ All chunks are valid!")
     else:
-        typer.echo(f"✗ Found {len(cast(list[str], validation_results['issues']))} issues:")
-        for issue in cast(list[str], validation_results["issues"]):
+        typer.echo(f"✗ Found {len(issues)} issues:")
+        for issue in issues:
             typer.echo(f"  • {issue}")
 
-    return validation_results
+    return OrganizedValidationResult(
+        valid=valid,
+        total_chunks=len(chunk_dirs),
+        chunk_details=chunk_details,
+        total_unique_parcels=total_unique_parcels,
+        total_records=total_records,
+        issues=issues
+    )

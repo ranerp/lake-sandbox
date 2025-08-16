@@ -4,6 +4,7 @@ import duckdb
 import typer
 
 from lake_sandbox.utils.performance import monitor_performance
+from lake_sandbox.validator.models import ReorganizationProgress, ChunkFile
 
 
 @monitor_performance()
@@ -170,7 +171,7 @@ def reorganize_by_parcel_chunks(
     return stats
 
 
-def get_reorganization_progress(output_dir: str) -> dict[str, int | list[dict[str, str | int]]]:
+def get_reorganization_progress(output_dir: str) -> ReorganizationProgress:
     """Check progress of reorganization by counting existing chunks.
 
     Args:
@@ -181,11 +182,11 @@ def get_reorganization_progress(output_dir: str) -> dict[str, int | list[dict[st
     """
     output_path = Path(output_dir)
     if not output_path.exists():
-        return {"existing_chunks": 0, "chunk_files": []}
+        return ReorganizationProgress(existing_chunks=0, chunk_files=[])
 
     chunk_dirs = [d for d in output_path.iterdir() if
                   d.is_dir() and d.name.startswith("parcel_chunk=")]
-    valid_chunks = []
+    valid_chunks: list[ChunkFile] = []
 
     conn = duckdb.connect()
 
@@ -200,18 +201,18 @@ def get_reorganization_progress(output_dir: str) -> dict[str, int | list[dict[st
                     continue
                 count = count_result[0]
                 if count > 0:
-                    valid_chunks.append({
-                        "chunk_id": chunk_dir.name,
-                        "file_path": str(data_file),
-                        "row_count": count
-                    })
+                    valid_chunks.append(ChunkFile(
+                        chunk_id=chunk_dir.name,
+                        file_path=str(data_file),
+                        row_count=count
+                    ))
             except Exception:
                 # File exists but is corrupted
                 pass
 
     conn.close()
 
-    return {
-        "existing_chunks": len(valid_chunks),
-        "chunk_files": valid_chunks
-    }
+    return ReorganizationProgress(
+        existing_chunks=len(valid_chunks),
+        chunk_files=valid_chunks
+    )

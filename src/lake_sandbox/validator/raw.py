@@ -61,7 +61,7 @@ def validate_raw_timeseries(
     conn = duckdb.connect()
     file_details: list[FileDetail] = []
     issues: list[str] = []
-    
+
     unique_parcels_overall: set[str] = set()
     parcel_counts_per_file: list[int] = []
     total_records = 0

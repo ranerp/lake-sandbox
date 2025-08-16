@@ -121,32 +121,31 @@ def show_reorganization_status(input_dir: str, output_dir: str, delta_dir: str) 
     # Check Phase 1 progress
     reorg_progress = get_reorganization_progress(output_dir)
     typer.echo(
-        f"Phase 1 (Reorganization): {reorg_progress['existing_chunks']} chunks completed")
+        f"Phase 1 (Reorganization): {reorg_progress.existing_chunks} chunks completed")
 
-    if reorg_progress['existing_chunks'] > 0:
-        total_rows = sum(chunk['row_count'] for chunk in reorg_progress['chunk_files'])
+    if reorg_progress.existing_chunks > 0:
+        total_rows = sum(chunk.row_count for chunk in reorg_progress.chunk_files)
         typer.echo(f"  Total rows in organized chunks: {total_rows:,}")
 
     # Check Phase 2 progress
     delta_progress = get_delta_conversion_progress(output_dir, delta_dir)
     typer.echo(
-        f"Phase 2 (Delta Conversion): {delta_progress['existing_delta_tables']}/{delta_progress['total_chunks']} Delta tables completed")
+        f"Phase 2 (Delta Conversion): {delta_progress.existing_delta_tables}/{delta_progress.total_chunks} Delta tables completed")
 
-    if delta_progress['existing_delta_tables'] > 0:
+    if delta_progress.existing_delta_tables > 0:
         total_files = sum(
-            table['file_count'] for table in delta_progress['delta_tables'])
+            table.file_count for table in delta_progress.delta_tables)
         typer.echo(f"  Total Delta files: {total_files}")
 
     # Recommendations
-    if reorg_progress['existing_chunks'] == 0:
+    if reorg_progress.existing_chunks == 0:
         typer.echo(
             "\n💡 Run: lake-sandbox reorg --phase reorg  (to start reorganization)")
-    elif delta_progress['existing_delta_tables'] < delta_progress['total_chunks']:
-        missing = delta_progress['total_chunks'] - delta_progress[
-            'existing_delta_tables']
+    elif delta_progress.existing_delta_tables < delta_progress.total_chunks:
+        missing = delta_progress.total_chunks - delta_progress.existing_delta_tables
         typer.echo(
             f"\n💡 Run: lake-sandbox reorg --phase delta  (to convert {missing} remaining chunks)")
-    elif delta_progress['existing_delta_tables'] > 0:
+    elif delta_progress.existing_delta_tables > 0:
         typer.echo(
             "\n💡 Run: lake-sandbox reorg --phase optimize  (to optimize Delta tables)")
         typer.echo("✅ Reorganization appears complete!")
