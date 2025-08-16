@@ -1,10 +1,10 @@
 [project]
 name = "lake-sandbox"
 version = "0.1.0"
-description = "Add your description here"
+description = "Lake sandboxing and pattern validations"
 readme = "README.md"
 authors = [
-    { name = "Raner P" }
+    { name = "Raner Piibur" }
 ]
 requires-python = ">=3.13"
 dependencies = [
