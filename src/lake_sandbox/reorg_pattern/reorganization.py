@@ -140,15 +140,15 @@ def show_reorganization_status(input_dir: str, output_dir: str, delta_dir: str) 
     # Recommendations
     if reorg_progress.existing_chunks == 0:
         typer.echo(
-            "\n💡 Run: lake-sandbox reorg --phase reorg  (to start reorganization)")
+            "\nRun: lake-sandbox reorg --phase reorg  (to start reorganization)")
     elif delta_progress.existing_delta_tables < delta_progress.total_chunks:
         missing = delta_progress.total_chunks - delta_progress.existing_delta_tables
         typer.echo(
-            f"\n💡 Run: lake-sandbox reorg --phase delta  (to convert {missing} remaining chunks)")
+            f"\nRun: lake-sandbox reorg --phase delta  (to convert {missing} remaining chunks)")
     elif delta_progress.existing_delta_tables > 0:
         typer.echo(
-            "\n💡 Run: lake-sandbox reorg --phase optimize  (to optimize Delta tables)")
-        typer.echo("✅ Reorganization appears complete!")
+            "\nRun: lake-sandbox reorg --phase optimize  (to optimize Delta tables)")
+        typer.echo("✓ Reorganization appears complete!")
 
     typer.echo("\nData locations:")
     typer.echo(f"  Raw data: {input_dir}")
