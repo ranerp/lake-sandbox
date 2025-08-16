@@ -12,8 +12,8 @@ def validate_organized_chunks(
     organized_dir: str,
     expected_chunk_size: int,
     expected_tiles: int,
-    expected_dates: int = None,
-    raw_dir: str = None,
+    expected_dates: int | None = None,
+    raw_dir: str | None = None,
     verbose: bool = False,
 ) -> OrganizedValidationResult:
     """Validate organized parcel chunks have correct structure and parcel counts.
@@ -43,7 +43,8 @@ def validate_organized_chunks(
             try:
                 conn_temp = duckdb.connect()
                 raw_files_pattern = str(raw_path / "**/*.parquet")
-                dates_result = conn_temp.execute(f"SELECT COUNT(DISTINCT date) FROM read_parquet('{raw_files_pattern}')").fetchone()
+                dates_result = conn_temp.execute(
+                    f"SELECT COUNT(DISTINCT date) FROM read_parquet('{raw_files_pattern}')").fetchone()
                 if dates_result and dates_result[0] > 0:
                     expected_dates = dates_result[0]
                     typer.echo(f"Found {expected_dates} unique dates in raw data")

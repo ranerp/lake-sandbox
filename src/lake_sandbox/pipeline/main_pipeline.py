@@ -1,9 +1,10 @@
 """Main DLT pipeline orchestrating timeseries generation, reorganization, and validation."""
 
-import dlt
-from typing import Dict, Any, Optional
-import typer
 from pathlib import Path
+from typing import Any
+
+import dlt
+import typer
 
 from lake_sandbox.pipeline.validation_stage import validation_resource
 from lake_sandbox.utils.performance import monitor_performance
@@ -27,14 +28,14 @@ def run_full_pipeline(
 
     # Validation parameters
     validation_target: str = "both",
-    expected_dates: Optional[int] = None,
+    expected_dates: int | None = None,
 
     # Pipeline parameters
     pipeline_name: str = "lake_sandbox_full_pipeline",
     destination: str = "duckdb",
     skip_existing: bool = True,
     validate_only: bool = False
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Run the complete lake-sandbox pipeline: generate -> reorganize -> validate.
 
     Args:
@@ -85,26 +86,27 @@ def run_full_pipeline(
         dataset_name="lake_sandbox"
     )
 
-    pipeline_results = {
+    pipeline_results: dict[str, Any] = {
         "pipeline_name": pipeline_name,
         "stages_completed": [],
         "stages_failed": [],
         "overall_status": "running"
     }
 
-
-
     try:
         # Stage 1: Timeseries Generation
         if not validate_only:
             raw_path = Path(output_dir)
-            should_generate = not skip_existing or not raw_path.exists() or len(list(raw_path.rglob("*.parquet"))) == 0
+            should_generate = not skip_existing or not raw_path.exists() or len(
+                list(raw_path.rglob("*.parquet"))) == 0
 
             if should_generate:
                 typer.echo("\nSTAGE 1: Timeseries Generation")
 
                 # Execute timeseries generation directly (not as DLT resource)
-                from lake_sandbox.timeseries_generator.generator import generate_timeseries
+                from lake_sandbox.timeseries_generator.generator import (
+                    generate_timeseries,
+                )
 
                 generate_timeseries(
                     output_dir=output_dir,
@@ -114,16 +116,18 @@ def run_full_pipeline(
                     num_parcels=total_parcels
                 )
 
-                typer.echo(f"Timeseries generation completed")
+                typer.echo("Timeseries generation completed")
                 pipeline_results["stages_completed"].append("timeseries_generation")
             else:
                 typer.echo("\nSTAGE 1: Skipping timeseries generation (data exists)")
-                pipeline_results["stages_completed"].append("timeseries_generation_skipped")
+                pipeline_results["stages_completed"].append(
+                    "timeseries_generation_skipped")
 
         # Stage 2: Reorganization
         if not validate_only:
             organized_path = Path(organized_dir)
-            should_reorganize = not skip_existing or not organized_path.exists() or len(list(organized_path.glob("parcel_chunk=*"))) == 0
+            should_reorganize = not skip_existing or not organized_path.exists() or len(
+                list(organized_path.glob("parcel_chunk=*"))) == 0
 
             if should_reorganize:
                 typer.echo("\n🔄 STAGE 2: Data Reorganization")
@@ -142,7 +146,7 @@ def run_full_pipeline(
                     status=False
                 )
 
-                typer.echo(f"Reorganization completed")
+                typer.echo("Reorganization completed")
                 pipeline_results["stages_completed"].append("reorganization")
             else:
                 typer.echo("\nSTAGE 2: Skipping reorganization (data exists)")
@@ -152,9 +156,10 @@ def run_full_pipeline(
         typer.echo("\nSTAGE 3: Data Validation")
 
         # Execute validation directly and log results to DLT
-        from lake_sandbox.validator.validation import validate
-        from io import StringIO
         import sys
+        from io import StringIO
+
+        from lake_sandbox.validator.validation import validate
 
         # Capture validation output
         old_stdout = sys.stdout
@@ -197,7 +202,8 @@ def run_full_pipeline(
         # Pipeline completed successfully
         pipeline_results["overall_status"] = "completed"
         typer.echo("\nPIPELINE COMPLETED SUCCESSFULLY!")
-        typer.echo(f"Stages completed: {', '.join(pipeline_results['stages_completed'])}")
+        typer.echo(
+            f"Stages completed: {', '.join(pipeline_results['stages_completed'])}")
 
         return pipeline_results
 
@@ -229,7 +235,8 @@ def run_pipeline_cli(
         "./output/timeseries-raw", "--output-dir", help="Raw data output directory"
     ),
     organized_dir: str = typer.Option(
-        "./output/timeseries-organized", "--organized-dir", help="Organized data directory"
+        "./output/timeseries-organized", "--organized-dir",
+        help="Organized data directory"
     ),
     delta_dir: str = typer.Option(
         "./output/timeseries-delta", "--delta-dir", help="Delta Lake directory"
@@ -240,12 +247,14 @@ def run_pipeline_cli(
         10_000, "--chunk-size", help="Number of parcels per chunk"
     ),
     reorg_phase: str = typer.Option(
-        "all", "--reorg-phase", help="Reorganization phase ('reorg', 'delta', 'optimize', 'all')"
+        "all", "--reorg-phase",
+        help="Reorganization phase ('reorg', 'delta', 'optimize', 'all')"
     ),
     validation_target: str = typer.Option(
-        "both", "--validation-target", help="Validation target ('raw', 'organized', 'delta', 'both')"
+        "both", "--validation-target",
+        help="Validation target ('raw', 'organized', 'delta', 'both')"
     ),
-    expected_dates: Optional[int] = typer.Option(
+    expected_dates: int | None = typer.Option(
         None, "--expected-dates", help="Expected number of dates per parcel"
     ),
 
@@ -257,7 +266,8 @@ def run_pipeline_cli(
         True, "--skip-existing/--no-skip-existing", help="Skip stages if output exists"
     ),
     validate_only: bool = typer.Option(
-        False, "--validate-only", help="Only run validation (skip generation and reorganization)"
+        False, "--validate-only",
+        help="Only run validation (skip generation and reorganization)"
     ),
     pipeline_name: str = typer.Option(
         "lake_sandbox_pipeline", "--pipeline-name", help="DLT pipeline name"

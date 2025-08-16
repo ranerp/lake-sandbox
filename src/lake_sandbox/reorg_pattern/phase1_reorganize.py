@@ -68,7 +68,8 @@ def reorganize_by_parcel_chunks(
     # Calculate total number of chunks needed
     # First, get sample data to estimate parcels per file
     sample_file = str(parquet_files[0])
-    sample_result = conn.execute(f"SELECT COUNT(*) FROM read_parquet('{sample_file}')").fetchone()
+    sample_result = conn.execute(
+        f"SELECT COUNT(*) FROM read_parquet('{sample_file}')").fetchone()
     if sample_result is None:
         raise ValueError("Sample query returned no results")
     sample_count = sample_result[0]

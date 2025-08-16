@@ -151,7 +151,8 @@ def convert_to_delta_lake(
     return stats
 
 
-def get_delta_conversion_progress(input_dir: str, delta_dir: str) -> DeltaConversionProgress:
+def get_delta_conversion_progress(input_dir: str,
+                                  delta_dir: str) -> DeltaConversionProgress:
     """Check progress of Delta conversion by comparing parquet chunks to Delta tables.
 
     Args:
@@ -165,7 +166,8 @@ def get_delta_conversion_progress(input_dir: str, delta_dir: str) -> DeltaConver
     delta_path = Path(delta_dir)
 
     if not input_path.exists():
-        return DeltaConversionProgress(total_chunks=0, existing_delta_tables=0, delta_tables=[])
+        return DeltaConversionProgress(total_chunks=0, existing_delta_tables=0,
+                                       delta_tables=[])
 
     # Count total parcel chunks available for conversion
     chunk_dirs = [d for d in input_path.iterdir() if
@@ -173,7 +175,8 @@ def get_delta_conversion_progress(input_dir: str, delta_dir: str) -> DeltaConver
     total_chunks = len(chunk_dirs)
 
     if not delta_path.exists():
-        return DeltaConversionProgress(total_chunks=total_chunks, existing_delta_tables=0, delta_tables=[])
+        return DeltaConversionProgress(total_chunks=total_chunks,
+                                       existing_delta_tables=0, delta_tables=[])
 
     # Count existing valid Delta tables
     delta_dirs = [d for d in delta_path.iterdir() if

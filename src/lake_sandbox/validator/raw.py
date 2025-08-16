@@ -97,7 +97,8 @@ def validate_raw_timeseries(
             file_total_records, unique_parcels, min_date, max_date = result
 
             # Check date consistency within partition
-            data_consistent = date_value == "unknown" or (str(min_date) == date_value and str(max_date) == date_value)
+            data_consistent = date_value == "unknown" or (
+                    str(min_date) == date_value and str(max_date) == date_value)
             if date_value != "unknown" and not data_consistent:
                 issue = f"{relative_path}: Date inconsistency - partition={date_value}, data range={min_date} to {max_date}"
                 issues.append(issue)
@@ -108,7 +109,8 @@ def validate_raw_timeseries(
 
             file_detail = FileDetail(
                 file_path=relative_path,
-                utm_tile=utm_tile.replace("utm_tile=", "") if utm_tile != "unknown" else utm_tile,
+                utm_tile=utm_tile.replace("utm_tile=",
+                                          "") if utm_tile != "unknown" else utm_tile,
                 year=year.replace("year=", "") if year != "unknown" else year,
                 date_partition=date_name,
                 date_value=date_value,

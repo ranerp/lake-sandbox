@@ -108,7 +108,8 @@ def validate_delta_tables(
             expected_combinations = unique_parcels * unique_dates
             missing_combinations = expected_combinations - unique_combinations
 
-            completeness_pct = (unique_combinations / expected_combinations * 100) if expected_combinations > 0 else 0
+            completeness_pct = (
+                    unique_combinations / expected_combinations * 100) if expected_combinations > 0 else 0
 
             table_detail = TableDetail(
                 table_name=table_name,
