@@ -6,7 +6,7 @@ A sandbox and example for timeseries data generation, reorganization, and valida
 
 - **Timeseries Generation**: Generate synthetic timeseries data for multiple UTM tiles with parcel IDs, NDVI, spectral bands, and meteorological data
 - **Data Reorganization**: Convert date-partitioned data to parcel-chunk-partitioned format with hash-based distribution
-- **Delta Lake Integration**: Convert reorganized data to Delta Lake format for ACID transactions and time travel
+- **Delta Lake Integration**: Convert reorganized data to a single partitioned Delta Lake table for ACID transactions and time travel
 - **Data Validation**: Comprehensive validation of raw, organized, and Delta Lake data with completeness checks
 - **Pipeline Orchestration**: End-to-end pipeline using DLT for execution tracking and monitoring
 - **Performance Monitoring**: Built-in performance monitoring with memory usage and execution time tracking
@@ -115,11 +115,13 @@ uv run lake-sandbox reorg \
 └── ...
 
 ./output/timeseries-delta/
-├── parcel_chunk=00/        # Delta Lake table
-│   ├── _delta_log/
-│   └── *.parquet
-├── parcel_chunk=01/
-└── ...
+└── parcel_data/            # Single partitioned Delta Lake table
+    ├── _delta_log/
+    ├── parcel_chunk=00/
+    │   └── *.parquet
+    ├── parcel_chunk=01/
+    │   └── *.parquet
+    └── ...
 ```
 
 ### 3. Data Validation
@@ -147,7 +149,7 @@ uv run lake-sandbox validate \
 **Validation Checks:**
 - **Raw**: Correct number of unique parcels across all files
 - **Organized**: Data completeness (each parcel has all expected dates), no parcel overlaps between chunks
-- **Delta**: Table integrity, parcel-date combinations completeness
+- **Delta**: Partitioned table integrity, parcel-date combinations completeness, no parcel overlaps between partitions
 
 ### 4. Check Status
 
@@ -167,7 +169,8 @@ The pipeline uses the following default directory structure:
 ./output/
 ├── timeseries-raw/          # Generated raw data (date-partitioned)
 ├── timeseries-organized/    # Reorganized data (parcel-chunk-partitioned)  
-└── timeseries-delta/        # Delta Lake tables
+└── timeseries-delta/        # Single partitioned Delta Lake table
+    └── parcel_data/         # Partitioned by parcel_chunk
 ```
 
 ### Key Parameters
@@ -274,7 +277,7 @@ CPU Usage: 87.2%
 
 - **"Too many parcels"**: Normal with hash-based partitioning, indicates slightly uneven distribution
 - **"Missing dates"**: Parcels missing data for some dates, check raw data completeness
-- **"Parcel overlap"**: Parcels appearing in multiple chunks, indicates reorganization issue
+- **"Parcel overlap"**: Parcels appearing in multiple partitions, indicates reorganization issue
 
 ### Getting Help
 
@@ -348,11 +351,11 @@ uv run lake-sandbox pipeline --validate-only --target both --verbose
 2. **Stage 2: Reorganization**
    - Converts from date-partitioned to parcel-chunk-partitioned
    - Uses hash-based distribution for balanced chunks
-   - Converts to Delta Lake format for ACID properties
+   - Converts to single partitioned Delta Lake table for ACID properties and automatic chunking
 
 3. **Stage 3: Validation**
-   - Validates data completeness and integrity
-   - Checks for parcel overlaps between chunks
+   - Validates partitioned Delta table completeness and integrity
+   - Checks for parcel overlaps between partitions
    - Ensures each parcel has all expected dates
 
 ## License
