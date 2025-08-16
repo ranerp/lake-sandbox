@@ -25,65 +25,97 @@ def connect_to_deltalake(
 
 @monitor_performance()
 def query_parcel_data(conn: duckdb.DuckDBPyConnection, delta_dir: str) -> pd.DataFrame:
-    """Query all parcel data from DeltaLake tables."""
+    """Query all parcel data from the single partitioned DeltaLake table."""
     delta_path = Path(delta_dir).absolute()
 
     # Check if delta directory exists
     if not delta_path.exists():
         raise FileNotFoundError(f"DeltaLake directory not found: {delta_path}")
 
-    # Find all parcel chunk directories
-    chunk_dirs = list(delta_path.glob("parcel_chunk=*"))
-    if not chunk_dirs:
-        raise FileNotFoundError(f"No parcel chunk directories found in: {delta_path}")
+    # Check for the single partitioned Delta table
+    delta_table_path = delta_path / "parcel_data"
+    if not delta_table_path.exists():
+        raise FileNotFoundError(f"Partitioned Delta table not found at: {delta_table_path}")
 
-    typer.echo(f"Found {len(chunk_dirs)} parcel chunks to query")
+    typer.echo(f"Querying partitioned Delta table at: {delta_table_path}")
 
-    # Query each chunk and combine
-    dataframes = []
-    for chunk_dir in sorted(chunk_dirs):
-        try:
-            query = f"""
-            SELECT
-                parcel_id,
-                date,
-                ndvi,
-                evi,
-                cloud_cover,
-            FROM delta_scan('{chunk_dir}')
-            """
-            df = conn.execute(query).df()
-            if not df.empty:
-                dataframes.append(df)
-                typer.echo(f"Loaded {len(df):,} records from {chunk_dir.name}")
-        except Exception as e:
-            typer.echo(f"Warning: Failed to read {chunk_dir.name}: {e}")
-            continue
-
-    if not dataframes:
-        raise ValueError("No data could be loaded from any DeltaLake tables")
-
-    # Combine all dataframes
-    combined_df = pd.concat(dataframes, ignore_index=True)
-    combined_df = combined_df.sort_values(['parcel_id', 'date']).reset_index(drop=True)
-
-    return combined_df
+    try:
+        # Query the single partitioned Delta table
+        query = f"""
+        SELECT
+            parcel_id,
+            date,
+            parcel_chunk,
+            ndvi,
+            evi,
+            temperature,
+            precipitation,
+            cloud_cover,
+            red,
+            nir,
+            blue,
+            green,
+            swir1,
+            swir2,
+            geometry_area
+        FROM delta_scan('{delta_table_path}')
+        ORDER BY parcel_chunk, parcel_id, date
+        """
+        df = conn.execute(query).df()
+        
+        if df.empty:
+            raise ValueError("No data found in the Delta table")
+        
+        typer.echo(f"Loaded {len(df):,} records for {df['parcel_id'].nunique():,} parcels")
+        typer.echo(f"Data spans {df['parcel_chunk'].nunique()} partitions")
+        
+        # Show partition distribution
+        partition_stats = df['parcel_chunk'].value_counts().sort_index()
+        typer.echo(f"Records per partition:")
+        for partition, count in partition_stats.head(5).items():
+            typer.echo(f"  Partition {partition}: {count:,} records")
+        if len(partition_stats) > 5:
+            typer.echo(f"  ... and {len(partition_stats) - 5} more partitions")
+        
+        return df
+        
+    except Exception as e:
+        raise ValueError(f"Failed to query Delta table: {e}")
 
 
 def analyze_timeseries_stats(df: pd.DataFrame) -> dict:
     """Calculate basic statistics about the timeseries data."""
     stats = {
         "total_parcels": df["parcel_id"].nunique(),
+        "total_partitions": df["parcel_chunk"].nunique(),
         "date_range": (df["date"].min(), df["date"].max()),
         "avg_ndvi": df["ndvi"].mean(),
+        "avg_evi": df["evi"].mean(),
+        "avg_temperature": df["temperature"].mean(),
+        "avg_precipitation": df["precipitation"].mean(),
         "avg_cloud_cover": df["cloud_cover"].mean(),
     }
 
     print("=== TIMESERIES DATA STATISTICS ===")
     print(f"Total parcels: {stats['total_parcels']:,}")
+    print(f"Total partitions: {stats['total_partitions']}")
     print(f"Date range: {stats['date_range'][0]} to {stats['date_range'][1]}")
     print(f"Average NDVI: {stats['avg_ndvi']:.3f}")
+    print(f"Average EVI: {stats['avg_evi']:.3f}")
+    print(f"Average temperature: {stats['avg_temperature']:.1f}°C")
+    print(f"Average precipitation: {stats['avg_precipitation']:.1f}mm")
     print(f"Average cloud cover: {stats['avg_cloud_cover']:.1f}%")
+    
+    # Partition statistics
+    print("\n=== PARTITION STATISTICS ===")
+    partition_stats = df.groupby('parcel_chunk').agg({
+        'parcel_id': ['count', 'nunique'],
+        'ndvi': 'mean',
+        'temperature': 'mean'
+    }).round(3)
+    partition_stats.columns = ['total_records', 'unique_parcels', 'avg_ndvi', 'avg_temp']
+    print("Top 5 partitions by record count:")
+    print(partition_stats.sort_values('total_records', ascending=False).head())
 
     return stats
 
@@ -117,8 +149,8 @@ def create_ndvi_timeseries_plot(df: pd.DataFrame, sample_parcels: int = 10):
 
 
 def create_vegetation_index_distribution(df: pd.DataFrame):
-    """Create distribution plots for vegetation indices."""
-    fig, axes = plt.subplots(2, 2, figsize=(15, 10))
+    """Create distribution plots for vegetation indices and environmental data."""
+    fig, axes = plt.subplots(2, 3, figsize=(18, 10))
 
     # NDVI distribution
     axes[0, 0].hist(df["ndvi"], bins=50, alpha=0.7, color='green')
@@ -132,11 +164,30 @@ def create_vegetation_index_distribution(df: pd.DataFrame):
     axes[0, 1].set_xlabel("EVI")
     axes[0, 1].set_ylabel("Frequency")
 
+    # Temperature distribution
+    axes[0, 2].hist(df["temperature"], bins=50, alpha=0.7, color='red')
+    axes[0, 2].set_title("Temperature Distribution")
+    axes[0, 2].set_xlabel("Temperature (°C)")
+    axes[0, 2].set_ylabel("Frequency")
+
+    # Precipitation distribution
+    axes[1, 0].hist(df["precipitation"], bins=50, alpha=0.7, color='blue')
+    axes[1, 0].set_title("Precipitation Distribution")
+    axes[1, 0].set_xlabel("Precipitation (mm)")
+    axes[1, 0].set_ylabel("Frequency")
+
     # Cloud cover distribution
     axes[1, 1].hist(df["cloud_cover"], bins=30, alpha=0.7, color='gray')
     axes[1, 1].set_title("Cloud Cover Distribution")
     axes[1, 1].set_xlabel("Cloud Cover (%)")
     axes[1, 1].set_ylabel("Frequency")
+
+    # Partition distribution
+    partition_counts = df['parcel_chunk'].value_counts().sort_index()
+    axes[1, 2].bar(range(len(partition_counts)), partition_counts.values, alpha=0.7, color='purple')
+    axes[1, 2].set_title("Records per Partition")
+    axes[1, 2].set_xlabel("Partition Index")
+    axes[1, 2].set_ylabel("Record Count")
 
     plt.tight_layout()
     plt.savefig("vegetation_distributions.png", dpi=300, bbox_inches='tight')
@@ -144,22 +195,24 @@ def create_vegetation_index_distribution(df: pd.DataFrame):
 
 
 def create_correlation_heatmap(df: pd.DataFrame):
-    """Create correlation heatmap between vegetation indices."""
+    """Create correlation heatmap between vegetation indices and environmental data."""
     # Select numeric columns for correlation
-    numeric_cols = ["ndvi", "evi", "cloud_cover"]
-    corr_data = df[numeric_cols].corr()
+    numeric_cols = ["ndvi", "evi", "temperature", "precipitation", "cloud_cover", "red", "nir", "blue", "green", "swir1", "swir2", "geometry_area"]
+    available_cols = [col for col in numeric_cols if col in df.columns]
+    corr_data = df[available_cols].corr()
 
-    plt.figure(figsize=(8, 6))
-    sns.heatmap(corr_data, annot=True, cmap='coolwarm', center=0,
-                square=True, fmt='.3f')
-    plt.title("Correlation Matrix: Vegetation Indices and Cloud Cover")
+    plt.figure(figsize=(12, 10))
+    mask = plt.np.triu(plt.np.ones_like(corr_data, dtype=bool))
+    sns.heatmap(corr_data, mask=mask, annot=True, cmap='coolwarm', center=0,
+                square=True, fmt='.2f', cbar_kws={"shrink": .8})
+    plt.title("Correlation Matrix: Vegetation Indices, Environmental & Spectral Data")
     plt.tight_layout()
     plt.savefig("correlation_heatmap.png", dpi=300, bbox_inches='tight')
     plt.close()
 
 
 def create_monthly_trends(df: pd.DataFrame):
-    """Analyze monthly trends in vegetation indices."""
+    """Analyze monthly trends in vegetation indices and environmental data."""
     df_copy = df.copy()
     df_copy["date"] = pd.to_datetime(df_copy["date"])
     df_copy["month"] = df_copy["date"].dt.month
@@ -168,6 +221,8 @@ def create_monthly_trends(df: pd.DataFrame):
     monthly_stats = df_copy.groupby("month_name").agg({
         "ndvi": "mean",
         "evi": "mean",
+        "temperature": "mean",
+        "precipitation": "mean",
         "cloud_cover": "mean"
     }).round(3)
 
@@ -175,12 +230,12 @@ def create_monthly_trends(df: pd.DataFrame):
     print(monthly_stats)
 
     # Create monthly trends plot
-    fig, axes = plt.subplots(2, 2, figsize=(15, 10))
+    fig, axes = plt.subplots(2, 3, figsize=(18, 10))
 
-    month_order = ["January", "February", "March", "April"]
-
-    # Filter data to only include months we have
+    # Get all available months in chronological order
     available_months = df_copy["month_name"].unique()
+    month_order = ["January", "February", "March", "April", "May", "June", 
+                   "July", "August", "September", "October", "November", "December"]
     month_order = [m for m in month_order if m in available_months]
 
     # NDVI trend
@@ -197,16 +252,78 @@ def create_monthly_trends(df: pd.DataFrame):
     axes[0, 1].set_ylabel("Average EVI")
     axes[0, 1].tick_params(axis='x', rotation=45)
 
+    # Temperature trend
+    monthly_temp = df_copy.groupby("month_name")["temperature"].mean().reindex(month_order)
+    axes[0, 2].plot(month_order, monthly_temp, marker='o', linewidth=2, color='red')
+    axes[0, 2].set_title("Monthly Temperature Trend")
+    axes[0, 2].set_ylabel("Average Temperature (°C)")
+    axes[0, 2].tick_params(axis='x', rotation=45)
+
+    # Precipitation trend
+    monthly_precip = df_copy.groupby("month_name")["precipitation"].mean().reindex(month_order)
+    axes[1, 0].plot(month_order, monthly_precip, marker='o', linewidth=2, color='blue')
+    axes[1, 0].set_title("Monthly Precipitation Trend")
+    axes[1, 0].set_ylabel("Average Precipitation (mm)")
+    axes[1, 0].tick_params(axis='x', rotation=45)
+
     # Cloud cover trend
-    monthly_cloud = df_copy.groupby("month_name")["cloud_cover"].mean().reindex(
-        month_order)
+    monthly_cloud = df_copy.groupby("month_name")["cloud_cover"].mean().reindex(month_order)
     axes[1, 1].plot(month_order, monthly_cloud, marker='o', linewidth=2, color='gray')
     axes[1, 1].set_title("Monthly Cloud Cover Trend")
     axes[1, 1].set_ylabel("Average Cloud Cover (%)")
     axes[1, 1].tick_params(axis='x', rotation=45)
 
+    # Partition data quality by month
+    monthly_partitions = df_copy.groupby("month_name")["parcel_chunk"].nunique().reindex(month_order)
+    axes[1, 2].plot(month_order, monthly_partitions, marker='o', linewidth=2, color='purple')
+    axes[1, 2].set_title("Active Partitions by Month")
+    axes[1, 2].set_ylabel("Number of Partitions")
+    axes[1, 2].tick_params(axis='x', rotation=45)
+
     plt.tight_layout()
     plt.savefig("monthly_trends.png", dpi=300, bbox_inches='tight')
+    plt.close()
+
+
+def create_partition_analysis(df: pd.DataFrame):
+    """Create partition-specific analysis plots."""
+    fig, axes = plt.subplots(2, 2, figsize=(15, 10))
+    
+    # Sample first 20 partitions for visualization
+    sample_partitions = sorted(df['parcel_chunk'].unique())[:20]
+    partition_subset = df[df['parcel_chunk'].isin(sample_partitions)]
+    
+    # NDVI by partition (box plot)
+    partition_subset.boxplot(column='ndvi', by='parcel_chunk', ax=axes[0, 0])
+    axes[0, 0].set_title("NDVI Distribution by Partition (First 20)")
+    axes[0, 0].set_xlabel("Partition")
+    axes[0, 0].set_ylabel("NDVI")
+    axes[0, 0].tick_params(axis='x', rotation=45)
+    
+    # Records per partition
+    partition_counts = df['parcel_chunk'].value_counts().sort_index()
+    axes[0, 1].bar(range(len(partition_counts.head(20))), partition_counts.head(20).values, alpha=0.7)
+    axes[0, 1].set_title("Records per Partition (First 20)")
+    axes[0, 1].set_xlabel("Partition Index")
+    axes[0, 1].set_ylabel("Record Count")
+    
+    # Average NDVI by partition
+    partition_ndvi = df.groupby('parcel_chunk')['ndvi'].mean().head(20)
+    axes[1, 0].bar(range(len(partition_ndvi)), partition_ndvi.values, alpha=0.7, color='green')
+    axes[1, 0].set_title("Average NDVI by Partition (First 20)")
+    axes[1, 0].set_xlabel("Partition Index")
+    axes[1, 0].set_ylabel("Average NDVI")
+    
+    # Unique parcels per partition
+    parcel_counts = df.groupby('parcel_chunk')['parcel_id'].nunique().head(20)
+    axes[1, 1].bar(range(len(parcel_counts)), parcel_counts.values, alpha=0.7, color='orange')
+    axes[1, 1].set_title("Unique Parcels per Partition (First 20)")
+    axes[1, 1].set_xlabel("Partition Index")
+    axes[1, 1].set_ylabel("Unique Parcels")
+    
+    plt.suptitle("")  # Remove default title
+    plt.tight_layout()
+    plt.savefig("partition_analysis.png", dpi=300, bbox_inches='tight')
     plt.close()
 
 
@@ -265,6 +382,7 @@ def analyze_data(
             create_vegetation_index_distribution(df)
             create_correlation_heatmap(df)
             create_monthly_trends(df)
+            create_partition_analysis(df)
 
             typer.echo(
                 f"\nAnalysis complete! Generated plots saved to: {Path(output_dir).absolute()}")
@@ -273,6 +391,7 @@ def analyze_data(
             typer.echo("- vegetation_distributions.png")
             typer.echo("- correlation_heatmap.png")
             typer.echo("- monthly_trends.png")
+            typer.echo("- partition_analysis.png")
 
         finally:
             # Return to original directory
