@@ -27,7 +27,7 @@ def parse_date_range(start_date: str, end_date: str, interval_days: int = 7) -> 
 
 
 def group_dates_by_year(dates: list[datetime]) -> dict[int, list[datetime]]:
-    """Group dates by year using functional approach with itertools.groupby.
+    """Group dates by year
 
     Args:
         dates: List of datetime objects (should be sorted by date)
