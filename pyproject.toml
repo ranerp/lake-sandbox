@@ -7,21 +7,12 @@ authors = [
     { name = "Raner P" }
 ]
 requires-python = ">=3.13"
-dependencies = []
+dependencies = [
+    "typer>=0.16.0",
+]
 
 [project.scripts]
 lake-sandbox = "lake_sandbox:main"
-
-[build-system]
-requires = ["uv_build>=0.8.11,<0.9.0"]
-build-backend = "uv_build"
-
-[dependency-groups]
-dev = [
-    "mypy>=1.17.1",
-    "pytest>=8.4.1",
-    "ruff>=0.12.9",
-]
 
 [tool.ruff]
 line-length = 88
@@ -46,3 +37,14 @@ ignore = [
 [tool.ruff.format]
 quote-style = "double"
 indent-style = "space"
+
+[build-system]
+requires = ["uv_build>=0.8.11,<0.9.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "mypy>=1.17.1",
+    "pytest>=8.4.1",
+    "ruff>=0.12.9",
+]
