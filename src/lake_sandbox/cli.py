@@ -5,6 +5,7 @@ from lake_sandbox.reorg_pattern.reorganization import reorg
 from lake_sandbox.streaming_assembly.assembly import streaming_assembly
 from lake_sandbox.timeseries_generator.generator import generate_timeseries
 from lake_sandbox.validator.validation import validate
+from lake_sandbox.examples.duckdb_analysis import analyze_data
 
 app = typer.Typer(help="Lake Sandbox CLI - Various utilities and tools")
 
@@ -20,6 +21,9 @@ app.command("validate",
 app.command("pipeline",
             help="Run the complete data pipeline: generate -> reorganize -> validate")(
     run_pipeline_cli)
+app.command("analyze",
+            help="Analyze DeltaLake timeseries data using DuckDB and create visualizations")(
+    analyze_data)
 
 
 def main() -> None:
