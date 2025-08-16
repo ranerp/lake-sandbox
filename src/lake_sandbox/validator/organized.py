@@ -22,6 +22,8 @@ def validate_organized_chunks(
         organized_dir: Directory with reorganized parquet files partitioned by parcel_chunk
         expected_chunk_size: Expected number of parcels per chunk
         expected_tiles: Expected number of UTM tiles (affects duplicate count)
+        expected_dates: Expected dates need to be in the organized chunks
+        raw_dir: Directory of raw data that was used to generate the organized data
         verbose: Show detailed validation info
 
     Returns:
@@ -152,7 +154,7 @@ def validate_organized_chunks(
 
             # Check data completeness: each parcel should have all expected dates
             expected_date_count = expected_dates if expected_dates is not None else unique_dates
-            
+
             incomplete_parcels_query = f"""
                 WITH parcel_date_counts AS (
                     SELECT parcel_id, COUNT(DISTINCT date) as date_count
@@ -163,10 +165,10 @@ def validate_organized_chunks(
                 FROM parcel_date_counts
                 WHERE date_count != {expected_date_count}
             """
-            
+
             incomplete_result = conn.execute(incomplete_parcels_query).fetchone()
             incomplete_parcels = incomplete_result[0] if incomplete_result else 0
-            
+
             if incomplete_parcels > 0:
                 issue = f"{chunk_name}: {incomplete_parcels} parcels missing dates (expected {expected_date_count} dates per parcel, found {unique_dates} unique dates)"
                 issues.append(issue)
