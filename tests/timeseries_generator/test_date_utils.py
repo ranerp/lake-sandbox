@@ -1,7 +1,11 @@
-import pytest
 from datetime import datetime
 
-from lake_sandbox.timeseries_generator.date_utils import group_dates_by_year, parse_date_range
+import pytest
+
+from lake_sandbox.timeseries_generator.date_utils import (
+    group_dates_by_year,
+    parse_date_range,
+)
 
 
 class TestParseDateRange:

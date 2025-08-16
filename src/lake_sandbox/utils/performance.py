@@ -1,9 +1,10 @@
 import functools
 import gc
 import time
+from collections.abc import Callable
 from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, Optional
+from typing import Any
 
 import psutil
 import typer
@@ -19,6 +20,20 @@ class PerformanceMetrics:
     memory_delta_mb: float
     cpu_percent: float
     function_name: str
+
+
+def _print_performance_summary(metrics: PerformanceMetrics) -> None:
+    """Print a formatted performance summary."""
+    typer.echo("\n" + "=" * 60)
+    typer.echo(f"PERFORMANCE SUMMARY: {metrics.function_name}")
+    typer.echo("=" * 60)
+    typer.echo(f"Execution Time: {metrics.execution_time:.2f} seconds")
+    typer.echo("    Memory Usage:")
+    typer.echo(f"   • Initial: {metrics.initial_memory_mb:.1f} MB")
+    typer.echo(f"   • Peak: {metrics.peak_memory_mb:.1f} MB")
+    typer.echo(f"   • Delta: {metrics.memory_delta_mb:+.1f} MB")
+    typer.echo(f"CPU Usage: {metrics.cpu_percent:.1f}%")
+    typer.echo("=" * 60 + "\n")
 
 
 class PerformanceMonitor:
@@ -74,23 +89,10 @@ class PerformanceMonitor:
             )
 
             # Print performance summary
-            self._print_performance_summary(metrics)
-
-    def _print_performance_summary(self, metrics: PerformanceMetrics) -> None:
-        """Print a formatted performance summary."""
-        typer.echo("\n" + "="*60)
-        typer.echo(f"🔧 PERFORMANCE SUMMARY: {metrics.function_name}")
-        typer.echo("="*60)
-        typer.echo(f"Execution Time: {metrics.execution_time:.2f} seconds")
-        typer.echo(f"    Memory Usage:")
-        typer.echo(f"   • Initial: {metrics.initial_memory_mb:.1f} MB")
-        typer.echo(f"   • Peak: {metrics.peak_memory_mb:.1f} MB")
-        typer.echo(f"   • Delta: {metrics.memory_delta_mb:+.1f} MB")
-        typer.echo(f"⚡ CPU Usage: {metrics.cpu_percent:.1f}%")
-        typer.echo("="*60 + "\n")
+            _print_performance_summary(metrics)
 
 
-def monitor_performance(function_name: Optional[str] = None):
+def monitor_performance(function_name: str | None = None):
     """Decorator to monitor performance of any function.
 
     Usage:
@@ -104,6 +106,7 @@ def monitor_performance(function_name: Optional[str] = None):
             # Your code here
             pass
     """
+
     def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
@@ -134,24 +137,26 @@ def performance_context(name: str = "operation"):
         yield monitor
 
 
-def get_system_info() -> Dict[str, Any]:
+def get_system_info() -> dict[str, Any]:
     """Get system information for performance context."""
     return {
         "cpu_count": psutil.cpu_count(),
         "cpu_count_logical": psutil.cpu_count(logical=True),
-        "memory_total_gb": psutil.virtual_memory().total / 1024**3,
-        "memory_available_gb": psutil.virtual_memory().available / 1024**3,
-        "disk_usage_gb": psutil.disk_usage("/").total / 1024**3,
+        "memory_total_gb": psutil.virtual_memory().total / 1024 ** 3,
+        "memory_available_gb": psutil.virtual_memory().available / 1024 ** 3,
+        "disk_usage_gb": psutil.disk_usage("/").total / 1024 ** 3,
     }
 
 
 def print_system_info() -> None:
     """Print system information."""
     info = get_system_info()
-    typer.echo("\n" + "="*60)
+    typer.echo("\n" + "=" * 60)
     typer.echo("SYSTEM INFORMATION")
-    typer.echo("="*60)
-    typer.echo(f"CPU Cores: {info['cpu_count']} physical, {info['cpu_count_logical']} logical")
-    typer.echo(f"Memory: {info['memory_total_gb']:.1f} GB total, {info['memory_available_gb']:.1f} GB available")
+    typer.echo("=" * 60)
+    typer.echo(
+        f"CPU Cores: {info['cpu_count']} physical, {info['cpu_count_logical']} logical")
+    typer.echo(
+        f"Memory: {info['memory_total_gb']:.1f} GB total, {info['memory_available_gb']:.1f} GB available")
     typer.echo(f"Disk: {info['disk_usage_gb']:.1f} GB total")
-    typer.echo("="*60 + "\n")
+    typer.echo("=" * 60 + "\n")

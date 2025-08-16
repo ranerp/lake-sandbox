@@ -67,8 +67,8 @@ def generate_timeseries(
             conn = duckdb.connect()
 
             # Set deterministic seed based on tile and date for consistent data
-            seed = abs(hash(f"{tile}_{date_str}")) % 2**31
-            conn.execute(f"SELECT setseed({seed / 2**31})")
+            seed = abs(hash(f"{tile}_{date_str}")) % 2 ** 31
+            conn.execute(f"SELECT setseed({seed / 2 ** 31})")
 
             # Generate synthetic timeseries data using DuckDB's vectorized functions
             conn.execute(f"""
