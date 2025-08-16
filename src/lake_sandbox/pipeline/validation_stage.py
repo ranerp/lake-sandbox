@@ -9,7 +9,14 @@ import typer
 from lake_sandbox.utils.performance import monitor_performance
 
 
-@dlt.resource(name="validation")
+@dlt.resource(
+    name="validation",
+    columns={
+        "results__organized__error": {"data_type": "text"},
+        "results__delta__error": {"data_type": "text"},
+        "expectations__dates": {"data_type": "bigint"}
+    }
+)
 @monitor_performance()
 def validation_resource(
     target: str = "both",

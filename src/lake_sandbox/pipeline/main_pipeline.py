@@ -1,11 +1,12 @@
 """Main DLT pipeline orchestrating timeseries generation, reorganization, and validation."""
 
-from pathlib import Path
 from typing import Any
 
 import dlt
 import typer
 
+from lake_sandbox.pipeline.reorganization_stage import reorganization_resource
+from lake_sandbox.pipeline.timeseries_stage import generate_timeseries_resource
 from lake_sandbox.pipeline.validation_stage import validation_resource
 from lake_sandbox.utils.performance import monitor_performance
 
@@ -32,9 +33,7 @@ def run_full_pipeline(
 
     # Pipeline parameters
     pipeline_name: str = "lake_sandbox_full_pipeline",
-    destination: str = "duckdb",
-    skip_existing: bool = True,
-    validate_only: bool = False
+    destination: str = "duckdb"
 ) -> dict[str, Any]:
     """Run the complete lake-sandbox pipeline: generate -> reorganize -> validate.
 
@@ -45,7 +44,6 @@ def run_full_pipeline(
         start_date: Start date for timeseries (YYYY-MM-DD)
         end_date: End date for timeseries (YYYY-MM-DD)
         tiles: Number of UTM tiles to generate
-        batch_size: Batch size for processing
 
         # Reorganization
         organized_dir: Directory for reorganized parquet chunks
@@ -61,8 +59,6 @@ def run_full_pipeline(
         # Pipeline
         pipeline_name: Name of the DLT pipeline
         destination: DLT destination (filesystem, parquet, etc.)
-        skip_existing: Skip stages if output already exists
-        validate_only: Only run validation (skip generation and reorganization)
 
     Returns:
         Dict with pipeline execution results
@@ -95,95 +91,34 @@ def run_full_pipeline(
 
     try:
         # Stage 1: Timeseries Generation
-        if not validate_only:
-            raw_path = Path(output_dir)
-            should_generate = not skip_existing or not raw_path.exists() or len(
-                list(raw_path.rglob("*.parquet"))) == 0
-
-            if should_generate:
-                typer.echo("\nSTAGE 1: Timeseries Generation")
-
-                # Execute timeseries generation directly (not as DLT resource)
-                from lake_sandbox.timeseries_generator.generator import (
-                    generate_timeseries,
-                )
-
-                generate_timeseries(
-                    output_dir=output_dir,
-                    utm_tiles=tiles,
-                    start_date=start_date,
-                    end_date=end_date,
-                    num_parcels=total_parcels
-                )
-
-                typer.echo("Timeseries generation completed")
-                pipeline_results["stages_completed"].append("timeseries_generation")
-            else:
-                typer.echo("\nSTAGE 1: Skipping timeseries generation (data exists)")
-                pipeline_results["stages_completed"].append(
-                    "timeseries_generation_skipped")
+        typer.echo("\nSTAGE 1: Timeseries Generation")
+        timeseries_data = generate_timeseries_resource(
+            output_dir=output_dir,
+            utm_tiles=tiles,
+            start_date=start_date,
+            end_date=end_date,
+            num_parcels=total_parcels
+        )
+        load_info = pipeline.run(timeseries_data)
+        typer.echo(f"Timeseries generation completed: {load_info}")
+        pipeline_results["stages_completed"].append("timeseries_generation")
 
         # Stage 2: Reorganization
-        if not validate_only:
-            organized_path = Path(organized_dir)
-            should_reorganize = not skip_existing or not organized_path.exists() or len(
-                list(organized_path.glob("parcel_chunk=*"))) == 0
+        typer.echo("\nSTAGE 2: Data Reorganization")
+        reorganization_data = reorganization_resource(
+            input_dir=output_dir,
+            output_dir=organized_dir,
+            delta_dir=delta_dir,
+            chunk_size=chunk_size,
+            phase=reorg_phase,
+            force=force
+        )
+        load_info = pipeline.run(reorganization_data)
+        typer.echo(f"Reorganization completed: {load_info}")
+        pipeline_results["stages_completed"].append("reorganization")
 
-            if should_reorganize:
-                typer.echo("\n🔄 STAGE 2: Data Reorganization")
-
-                # Execute reorganization directly (not as DLT resource)
-                from lake_sandbox.reorg_pattern.reorganization import reorg
-
-                reorg(
-                    input_dir=output_dir,
-                    output_dir=organized_dir,
-                    delta_dir=delta_dir,
-                    chunk_size=chunk_size,
-                    phase=reorg_phase,
-                    force=force,
-                    dry_run=False,
-                    status=False
-                )
-
-                typer.echo("Reorganization completed")
-                pipeline_results["stages_completed"].append("reorganization")
-            else:
-                typer.echo("\nSTAGE 2: Skipping reorganization (data exists)")
-                pipeline_results["stages_completed"].append("reorganization_skipped")
-
-        # Stage 3: Validation (always run)
+        # Stage 3: Validation
         typer.echo("\nSTAGE 3: Data Validation")
-
-        # Execute validation directly and log results to DLT
-        import sys
-        from io import StringIO
-
-        from lake_sandbox.validator.validation import validate
-
-        # Capture validation output
-        old_stdout = sys.stdout
-        sys.stdout = validation_output = StringIO()
-
-        try:
-            validate(
-                target=validation_target,
-                organized_dir=organized_dir,
-                delta_dir=delta_dir,
-                raw_dir=output_dir,
-                expected_total_parcels=total_parcels,
-                expected_chunk_size=chunk_size,
-                expected_tiles=tiles_count,
-                expected_dates=expected_dates,
-                verbose=False
-            )
-        finally:
-            sys.stdout = old_stdout
-
-        validation_output_str = validation_output.getvalue()
-        typer.echo(validation_output_str)
-
-        # Log validation results to DLT for tracking
         validation_data = validation_resource(
             target=validation_target,
             organized_dir=organized_dir,
@@ -194,9 +129,8 @@ def run_full_pipeline(
             expected_tiles=tiles_count,
             expected_dates=expected_dates
         )
-
         load_info = pipeline.run(validation_data)
-        typer.echo(f"Validation completed and logged: {load_info}")
+        typer.echo(f"Validation completed: {load_info}")
         pipeline_results["stages_completed"].append("validation")
 
         # Pipeline completed successfully
@@ -262,13 +196,6 @@ def run_pipeline_cli(
     force: bool = typer.Option(
         False, "--force", help="Force reprocessing of existing files"
     ),
-    skip_existing: bool = typer.Option(
-        True, "--skip-existing/--no-skip-existing", help="Skip stages if output exists"
-    ),
-    validate_only: bool = typer.Option(
-        False, "--validate-only",
-        help="Only run validation (skip generation and reorganization)"
-    ),
     pipeline_name: str = typer.Option(
         "lake_sandbox_pipeline", "--pipeline-name", help="DLT pipeline name"
     ),
@@ -299,7 +226,5 @@ def run_pipeline_cli(
 
         # Pipeline
         pipeline_name=pipeline_name,
-        destination=destination,
-        skip_existing=skip_existing,
-        validate_only=validate_only
+        destination=destination
     )

@@ -15,21 +15,19 @@ from lake_sandbox.utils.performance import monitor_performance
 @monitor_performance()
 def generate_timeseries_resource(
     output_dir: str = "./output/timeseries-raw",
-    total_parcels: int = 500_000,
+    utm_tiles: str = "32TNR,32TPR",
     start_date: str = "2024-01-01",
     end_date: str = "2024-04-15",
-    tiles: int = 2,
-    batch_size: int = 50_000,
+    num_parcels: int = 500_000,
 ) -> Iterator[dict[str, Any]]:
     """DLT resource for generating timeseries data.
 
     Args:
         output_dir: Directory to save generated parquet files
-        total_parcels: Total number of parcels to generate
+        utm_tiles: Comma-separated UTM tile identifiers
         start_date: Start date for timeseries (YYYY-MM-DD)
         end_date: End date for timeseries (YYYY-MM-DD)
-        tiles: Number of UTM tiles to generate
-        batch_size: Batch size for processing
+        num_parcels: Number of parcels to generate per tile
 
     Yields:
         Dict with generation status and statistics
@@ -39,15 +37,12 @@ def generate_timeseries_resource(
 
     try:
         # Call the existing timeseries generator
-        stats = generate_timeseries(
+        generate_timeseries(
             output_dir=output_dir,
-            total_parcels=total_parcels,
+            utm_tiles=utm_tiles,
             start_date=start_date,
             end_date=end_date,
-            tiles=tiles,
-            batch_size=batch_size,
-            dry_run=False,
-            force=False
+            num_parcels=num_parcels
         )
 
         # Verify output exists
@@ -58,15 +53,18 @@ def generate_timeseries_resource(
         else:
             file_count = 0
 
+        # Count tiles from comma-separated string
+        tiles_count = len([tile.strip() for tile in utm_tiles.split(",") if tile.strip()])
+
         yield {
             "stage": "timeseries_generation",
             "status": "completed",
             "output_dir": output_dir,
-            "stats": stats,
             "output_files": file_count,
-            "total_parcels": total_parcels,
+            "num_parcels": num_parcels,
             "date_range": f"{start_date} to {end_date}",
-            "tiles": tiles
+            "utm_tiles": utm_tiles,
+            "tiles_count": tiles_count
         }
 
     except Exception as e:
