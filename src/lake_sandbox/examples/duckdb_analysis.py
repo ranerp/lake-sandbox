@@ -1,17 +1,18 @@
 """Example: Analyzing DeltaLake data with DuckDB and creating visualizations."""
 
+from pathlib import Path
+
 import duckdb
-import pandas as pd
 import matplotlib.pyplot as plt
+import pandas as pd
 import seaborn as sns
 import typer
-from pathlib import Path
-from datetime import datetime
 
 from lake_sandbox.utils.performance import monitor_performance
 
 
-def connect_to_deltalake(delta_dir: str = "./output/timeseries-delta") -> duckdb.DuckDBPyConnection:
+def connect_to_deltalake(
+    delta_dir: str = "./output/timeseries-delta") -> duckdb.DuckDBPyConnection:
     """Connect to DeltaLake data using DuckDB."""
     conn = duckdb.connect()
 
@@ -20,6 +21,7 @@ def connect_to_deltalake(delta_dir: str = "./output/timeseries-delta") -> duckdb
     conn.execute("LOAD delta")
 
     return conn
+
 
 @monitor_performance()
 def query_parcel_data(conn: duckdb.DuckDBPyConnection, delta_dir: str) -> pd.DataFrame:
@@ -102,7 +104,7 @@ def create_ndvi_timeseries_plot(df: pd.DataFrame, sample_parcels: int = 10):
     for parcel_id in sample_ids:
         parcel_data = sample_data[sample_data["parcel_id"] == parcel_id]
         plt.plot(parcel_data["date"], parcel_data["ndvi"],
-                marker='o', markersize=3, alpha=0.7, label=f"Parcel {parcel_id}")
+                 marker='o', markersize=3, alpha=0.7, label=f"Parcel {parcel_id}")
 
     plt.title(f"NDVI Timeseries for {sample_parcels} Sample Parcels")
     plt.xlabel("Date")
@@ -196,7 +198,8 @@ def create_monthly_trends(df: pd.DataFrame):
     axes[0, 1].tick_params(axis='x', rotation=45)
 
     # Cloud cover trend
-    monthly_cloud = df_copy.groupby("month_name")["cloud_cover"].mean().reindex(month_order)
+    monthly_cloud = df_copy.groupby("month_name")["cloud_cover"].mean().reindex(
+        month_order)
     axes[1, 1].plot(month_order, monthly_cloud, marker='o', linewidth=2, color='gray')
     axes[1, 1].set_title("Monthly Cloud Cover Trend")
     axes[1, 1].set_ylabel("Average Cloud Cover (%)")
@@ -263,7 +266,8 @@ def analyze_data(
             create_correlation_heatmap(df)
             create_monthly_trends(df)
 
-            typer.echo(f"\nAnalysis complete! Generated plots saved to: {Path(output_dir).absolute()}")
+            typer.echo(
+                f"\nAnalysis complete! Generated plots saved to: {Path(output_dir).absolute()}")
             typer.echo("Generated files:")
             typer.echo("- ndvi_timeseries.png")
             typer.echo("- vegetation_distributions.png")

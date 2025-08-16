@@ -54,7 +54,8 @@ def generate_timeseries_resource(
             file_count = 0
 
         # Count tiles from comma-separated string
-        tiles_count = len([tile.strip() for tile in utm_tiles.split(",") if tile.strip()])
+        tiles_count = len(
+            [tile.strip() for tile in utm_tiles.split(",") if tile.strip()])
 
         yield {
             "stage": "timeseries_generation",

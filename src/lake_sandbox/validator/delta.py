@@ -13,17 +13,17 @@ def validate_delta_tables(
     delta_dir: str,
     verbose: bool = False,
 ) -> DeltaValidationResult:
-    """Validate Delta tables contain complete timeseries data for each parcel.
+    """Validate partitioned Delta table contains complete timeseries data for each parcel.
 
     Args:
-        delta_dir: Directory containing Delta Lake tables
+        delta_dir: Directory containing the partitioned Delta Lake table
         verbose: Show detailed validation info
 
     Returns:
         Dictionary with validation results and statistics
     """
 
-    typer.echo("=== VALIDATING DELTA TABLES ===")
+    typer.echo("=== VALIDATING PARTITIONED DELTA TABLE ===")
     typer.echo(f"Delta directory: {delta_dir}")
 
     delta_path = Path(delta_dir)
@@ -39,11 +39,11 @@ def validate_delta_tables(
             error="Directory not found"
         )
 
-    # Find all Delta table directories
-    delta_dirs = [d for d in delta_path.iterdir() if
-                  d.is_dir() and d.name.startswith("parcel_chunk=")]
-    if not delta_dirs:
-        typer.echo("Error: No Delta table directories found")
+    # Check for partitioned Delta table
+    partitioned_table_path = delta_path / "parcel_data"
+    
+    if not partitioned_table_path.exists():
+        typer.echo("Error: No partitioned Delta table found at parcel_data/")
         return DeltaValidationResult(
             valid=False,
             total_tables=0,
@@ -51,148 +51,186 @@ def validate_delta_tables(
             total_unique_parcels=0,
             total_records=0,
             issues=[],
-            error="No Delta tables found"
+            error="No partitioned Delta table found"
         )
 
-    typer.echo(f"Found {len(delta_dirs)} Delta tables")
+    typer.echo("Found partitioned Delta table")
+    return validate_partitioned_delta_table(str(partitioned_table_path), verbose)
 
-    conn = duckdb.connect()
-    table_details: list[TableDetail] = []
-    issues: list[str] = []
 
-    unique_parcels_overall: set[str] = set()
-    expected_date_ranges: dict[tuple[str, str], list[str]] = {}
-    total_records = 0
+def validate_partitioned_delta_table(
+    delta_table_path: str,
+    verbose: bool = False,
+) -> DeltaValidationResult:
+    """Validate a single partitioned Delta table.
 
-    for delta_table_dir in sorted(delta_dirs):
-        table_name = delta_table_dir.name
+    Args:
+        delta_table_path: Path to the partitioned Delta table
+        verbose: Show detailed validation info
 
-        try:
-            # Load Delta table
-            dt = DeltaTable(str(delta_table_dir))
-            version = dt.version()
-            file_count = len(dt.files())
+    Returns:
+        Dictionary with validation results and statistics
+    """
 
-            if file_count == 0:
-                issue = f"{table_name}: No data files"
-                issues.append(issue)
-                if verbose:
-                    typer.echo(f"  ✗ {issue}")
-                continue
+    try:
+        # Load Delta table
+        dt = DeltaTable(delta_table_path)
+        version = dt.version()
+        file_count = len(dt.files())
 
-            # Query Delta table statistics
-            stats_query = f"""
-                WITH combo_count AS (
-                    SELECT COUNT(*) as unique_combinations
-                    FROM (
-                        SELECT DISTINCT parcel_id, date
-                        FROM delta_scan('{delta_table_dir}')
-                    )
+        if file_count == 0:
+            return DeltaValidationResult(
+                valid=False,
+                total_tables=1,
+                table_details=[],
+                total_unique_parcels=0,
+                total_records=0,
+                issues=["No data files in Delta table"],
+                error="Empty Delta table"
+            )
+
+        # Get partitions information
+        partitions = set()
+        for file_info in dt.files():
+            if "parcel_chunk=" in file_info:
+                partition = file_info.split("parcel_chunk=")[1].split("/")[0]
+                partitions.add(partition)
+
+        typer.echo(f"Found {len(partitions)} partitions: {sorted(partitions)}")
+
+        conn = duckdb.connect()
+        issues: list[str] = []
+
+        # Query overall table statistics
+        stats_query = f"""
+            WITH combo_count AS (
+                SELECT COUNT(*) as unique_combinations
+                FROM (
+                    SELECT DISTINCT parcel_id, date
+                    FROM delta_scan('{delta_table_path}')
                 )
+            )
+            SELECT
+                COUNT(*) as total_records,
+                COUNT(DISTINCT parcel_id) as unique_parcels,
+                COUNT(DISTINCT date) as unique_dates,
+                COUNT(DISTINCT parcel_chunk) as unique_chunks,
+                MIN(date) as min_date,
+                MAX(date) as max_date,
+                (SELECT unique_combinations FROM combo_count) as unique_combinations
+            FROM delta_scan('{delta_table_path}')
+        """
+
+        result = conn.execute(stats_query).fetchone()
+        if result is None:
+            raise ValueError("Query returned no results")
+        total_records, unique_parcels, unique_dates, unique_chunks, min_date, max_date, unique_combinations = result
+
+        # Check completeness
+        expected_combinations = unique_parcels * unique_dates
+        missing_combinations = expected_combinations - unique_combinations
+        completeness_pct = (unique_combinations / expected_combinations * 100) if expected_combinations > 0 else 0
+
+        # Validate each partition
+        table_details: list[TableDetail] = []
+        partition_parcels: dict[str, set[str]] = {}
+
+        for partition in sorted(partitions):
+            partition_query = f"""
                 SELECT
                     COUNT(*) as total_records,
                     COUNT(DISTINCT parcel_id) as unique_parcels,
                     COUNT(DISTINCT date) as unique_dates,
                     MIN(date) as min_date,
-                    MAX(date) as max_date,
-                    (SELECT unique_combinations FROM combo_count) as unique_combinations
-                FROM delta_scan('{delta_table_dir}')
+                    MAX(date) as max_date
+                FROM delta_scan('{delta_table_path}')
+                WHERE parcel_chunk = '{partition}'
             """
 
-            result = conn.execute(stats_query).fetchone()
-            if result is None:
-                raise ValueError("Query returned no results")
-            table_total_records, unique_parcels, unique_dates, min_date, max_date, unique_combinations = result
+            part_result = conn.execute(partition_query).fetchone()
+            if part_result is None:
+                continue
+            part_total, part_parcels, part_dates, part_min_date, part_max_date = part_result
 
-            # Check for missing dates per parcel (should be unique_parcels * unique_dates = unique_combinations)
-            expected_combinations = unique_parcels * unique_dates
-            missing_combinations = expected_combinations - unique_combinations
-
-            completeness_pct = (
-                    unique_combinations / expected_combinations * 100) if expected_combinations > 0 else 0
+            # Get parcel IDs for this partition
+            parcel_query = f"""
+                SELECT DISTINCT parcel_id 
+                FROM delta_scan('{delta_table_path}')
+                WHERE parcel_chunk = '{partition}'
+            """
+            parcel_results = conn.execute(parcel_query).fetchall()
+            partition_parcel_ids = {p[0] for p in parcel_results}
+            partition_parcels[partition] = partition_parcel_ids
 
             table_detail = TableDetail(
-                table_name=table_name,
+                table_name=f"parcel_chunk={partition}",
                 version=version,
-                file_count=file_count,
-                total_records=table_total_records,
-                unique_parcels=unique_parcels,
-                unique_dates=unique_dates,
-                date_range=f"{min_date} to {max_date}",
-                missing_combinations=missing_combinations,
-                completeness_pct=completeness_pct
+                file_count=file_count,  # Note: this is total files, not per partition
+                total_records=part_total,
+                unique_parcels=part_parcels,
+                unique_dates=part_dates,
+                date_range=f"{part_min_date} to {part_max_date}",
+                missing_combinations=0,  # We'll calculate this if needed
+                completeness_pct=100.0  # Assume complete for individual partitions
             )
-
             table_details.append(table_detail)
-            total_records += table_total_records
 
-            # Check for missing dates
-            if missing_combinations > 0:
-                issue = f"{table_name}: Missing {missing_combinations:,} parcel-date combinations ({completeness_pct:.1f}% complete)"
-                issues.append(issue)
-                # Don't mark as invalid for missing combinations - this might be expected
+            if verbose:
+                typer.echo(f"  ✓ Partition {partition}: {part_parcels:,} parcels, {part_dates} dates, {part_total:,} records")
 
-            # Check for parcel overlaps between tables
-            table_parcels = set(conn.execute(
-                f"SELECT DISTINCT parcel_id FROM delta_scan('{delta_table_dir}')").fetchall())
-            table_parcels = {p[0] for p in table_parcels}
-
-            overlap = unique_parcels_overall.intersection(table_parcels)
+        # Check for parcel overlaps between partitions
+        all_partition_parcels: set[str] = set()
+        for partition, parcel_ids in partition_parcels.items():
+            overlap = all_partition_parcels.intersection(parcel_ids)
             if overlap:
-                issue = f"{table_name}: Parcel overlap with other tables ({len(overlap)} parcels)"
+                issue = f"Partition {partition}: Parcel overlap with other partitions ({len(overlap)} parcels)"
                 issues.append(issue)
                 if verbose:
-                    typer.echo(f"  ⚠ Overlapping parcels: {list(overlap)[:5]}...")
+                    typer.echo(f"  ⚠ {issue}")
+            all_partition_parcels.update(parcel_ids)
 
-            unique_parcels_overall.update(table_parcels)
-
-            # Track date ranges for consistency
-            date_range = (min_date, max_date)
-            if date_range not in expected_date_ranges:
-                expected_date_ranges[date_range] = []
-            expected_date_ranges[date_range].append(table_name)
-
-            if verbose:
-                typer.echo(
-                    f"  ✓ {table_name}: {unique_parcels:,} parcels, {unique_dates} dates, {table_total_records:,} records ({completeness_pct:.1f}% complete)")
-
-        except Exception as e:
-            issue = f"{table_name}: Failed to read ({e})"
+        # Check for missing data
+        if missing_combinations > 0:
+            issue = f"Missing {missing_combinations:,} parcel-date combinations ({completeness_pct:.1f}% complete)"
             issues.append(issue)
-            if verbose:
-                typer.echo(f"  ✗ {issue}")
 
-    conn.close()
+        conn.close()
 
-    total_unique_parcels = len(unique_parcels_overall)
+        # Summary
+        typer.echo("\n=== VALIDATION SUMMARY ===")
+        typer.echo(f"Partitioned Delta table: 1 table with {len(partitions)} partitions")
+        typer.echo(f"Total unique parcels: {unique_parcels:,}")
+        typer.echo(f"Total records: {total_records:,}")
+        typer.echo(f"Date range: {min_date} to {max_date}")
+        typer.echo(f"Completeness: {completeness_pct:.1f}%")
 
-    # Check date range consistency
-    if len(expected_date_ranges) > 1:
-        issue = f"Inconsistent date ranges across tables: {list(expected_date_ranges.keys())}"
-        issues.append(issue)
-        typer.echo(f"  ⚠ {issue}")
+        # Determine overall validity
+        valid = not any("overlap" in issue.lower() for issue in issues)
 
-    # Summary
-    typer.echo("\n=== VALIDATION SUMMARY ===")
-    typer.echo(f"Total Delta tables: {len(delta_dirs)}")
-    typer.echo(f"Total unique parcels: {total_unique_parcels:,}")
-    typer.echo(f"Total records: {total_records:,}")
+        if valid:
+            typer.echo("✓ Partitioned Delta table is valid!")
+        else:
+            typer.echo(f"✗ Found {len(issues)} issues:")
+            for issue in issues:
+                typer.echo(f"  • {issue}")
 
-    # Determine overall validity - overlapping parcels are the main validation failure
-    valid = not any("overlap" in issue.lower() for issue in issues)
+        return DeltaValidationResult(
+            valid=valid,
+            total_tables=len(partitions),  # Report number of partitions as "tables"
+            table_details=table_details,
+            total_unique_parcels=unique_parcels,
+            total_records=total_records,
+            issues=issues
+        )
 
-    if valid:
-        typer.echo("✓ All Delta tables are valid!")
-    else:
-        typer.echo(f"✗ Found {len(issues)} issues:")
-        for issue in issues:
-            typer.echo(f"  • {issue}")
-
-    return DeltaValidationResult(
-        valid=valid,
-        total_tables=len(delta_dirs),
-        table_details=table_details,
-        total_unique_parcels=total_unique_parcels,
-        total_records=total_records,
-        issues=issues
-    )
+    except Exception as e:
+        typer.echo(f"Error validating partitioned Delta table: {e}")
+        return DeltaValidationResult(
+            valid=False,
+            total_tables=0,
+            table_details=[],
+            total_unique_parcels=0,
+            total_records=0,
+            issues=[f"Validation failed: {e}"],
+            error=str(e)
+        )

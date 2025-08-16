@@ -98,7 +98,7 @@ def validate_raw_timeseries(
 
             # Check date consistency within partition
             data_consistent = date_value == "unknown" or (
-                    str(min_date) == date_value and str(max_date) == date_value)
+                str(min_date) == date_value and str(max_date) == date_value)
             if date_value != "unknown" and not data_consistent:
                 issue = f"{relative_path}: Date inconsistency - partition={date_value}, data range={min_date} to {max_date}"
                 issues.append(issue)
