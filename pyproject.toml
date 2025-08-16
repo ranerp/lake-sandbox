@@ -8,7 +8,19 @@ authors = [
 ]
 requires-python = ">=3.13"
 dependencies = [
+    "dask>=2025.7.0",
+    "deltalake>=1.1.4",
+    "numpy>=2.3.2",
+    "pandas>=2.3.1",
     "typer>=0.16.0",
+]
+
+[dependency-groups]
+dev = [
+    "mypy>=1.17.1",
+    "pandas-stubs>=2.3.0.250703",
+    "pytest>=8.4.1",
+    "ruff>=0.12.9",
 ]
 
 [project.scripts]
@@ -42,9 +54,4 @@ indent-style = "space"
 requires = ["uv_build>=0.8.11,<0.9.0"]
 build-backend = "uv_build"
 
-[dependency-groups]
-dev = [
-    "mypy>=1.17.1",
-    "pytest>=8.4.1",
-    "ruff>=0.12.9",
-]
+

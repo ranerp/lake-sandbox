@@ -3,7 +3,9 @@ import typer
 
 def reorg(
     path: str = typer.Argument(..., help="Path to reorganize"),
-    dry_run: bool = typer.Option(False, "--dry-run", help="Show what would be done without making changes"),
+    dry_run: bool = typer.Option(
+        False, "--dry-run", help="Show what would be done without making changes"
+    ),
 ) -> None:
     """Reorganize delta files in the specified path."""
     if dry_run:
