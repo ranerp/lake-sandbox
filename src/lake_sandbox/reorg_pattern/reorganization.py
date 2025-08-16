@@ -1,7 +1,7 @@
 import typer
 
 
-def delta_reorg(
+def reorg(
     path: str = typer.Argument(..., help="Path to reorganize"),
     dry_run: bool = typer.Option(False, "--dry-run", help="Show what would be done without making changes"),
 ) -> None:
