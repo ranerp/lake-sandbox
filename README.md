@@ -250,17 +250,53 @@ All commands include built-in performance monitoring that tracks:
 - **Memory Usage**: Initial, peak, and delta memory consumption
 - **CPU Usage**: Average CPU utilization during execution
 
-Example output:
+### Benchmark Results (MacBook Pro M1)
+
+**Test Configuration:**
+```bash
+uv run lake-sandbox pipeline \
+  --num-parcels 1000000 \
+  --utm-tiles "32TNR,32TPR,32TNS" \
+  --start-date 2024-01-01 \
+  --end-date 2024-12-31 \
+  --chunk-size 10000
+```
+
+**Dataset:** 1M parcels × 3 UTM tiles × 365 days = ~159M records after deduplication
+
+| Stage | Duration | Memory Peak | CPU Usage | Output Size |
+|-------|----------|-------------|-----------|-------------|
+| **Timeseries Generation** | 1.1 min | - | 180% | 15 GB |
+| **Phase 1: Reorganization** | 13.5 min | 1.2 GB | 138% | 15 GB |
+| **Phase 2: Delta Conversion** | 1.0 min | 1.9 GB | 187% | 5.1 GB |
+| **Phase 3: Optimization** | <1 sec | 1.9 GB | 80% | - |
+| **Validation** | 15 sec | 2.2 GB | 375% | - |
+| **Total Pipeline** | **17.0 min** | **2.2 GB** | **149%** | **20.1 GB** |
+
+**Key Insights:**
+- **67% compression**: Delta Lake (5.1 GB) vs raw parquet (15 GB)
+- **Memory efficiency**: Peak usage only 2.2 GB for 159M records
+- **CPU utilization**: Excellent multi-core performance (>100% indicates parallel processing)
+- **Validation speed**: Cross-validation of 100 partitions in 15 seconds
+
+**Storage Breakdown:**
+```
+output/timeseries-raw/        15G  (Raw parquet files)
+output/timeseries-organized/  15G  (Reorganized chunks)  
+output/timeseries-delta/     5.1G  (Partitioned Delta Lake)
+```
+
+Example detailed output:
 ```
 ============================================================
-PERFORMANCE SUMMARY: generate_timeseries
+PERFORMANCE SUMMARY: convert_to_delta_lake
 ============================================================
-Execution Time: 45.23 seconds
+Execution Time: 62.09 seconds
     Memory Usage:
-   • Initial: 142.7 MB
-   • Peak: 1,247.3 MB  
-   • Delta: +1,104.6 MB
-CPU Usage: 87.2%
+   • Initial: 1043.0 MB
+   • Peak: 1856.8 MB
+   • Delta: +813.4 MB
+CPU Usage: 187.3%
 ============================================================
 ```
 
