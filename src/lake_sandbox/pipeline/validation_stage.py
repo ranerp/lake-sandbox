@@ -1,11 +1,11 @@
 """DLT pipeline stage for data validation."""
 
+from collections.abc import Iterator
+from typing import Any
+
 import dlt
-from typing import Iterator, Dict, Any
-from pathlib import Path
 import typer
 
-from lake_sandbox.validator.validation import validate
 from lake_sandbox.utils.performance import monitor_performance
 
 
@@ -14,40 +14,40 @@ from lake_sandbox.utils.performance import monitor_performance
 def validation_resource(
     target: str = "both",
     organized_dir: str = "./output/timeseries-organized",
-    delta_dir: str = "./output/timeseries-delta", 
+    delta_dir: str = "./output/timeseries-delta",
     raw_dir: str = "./output/timeseries-raw",
     expected_total_parcels: int = 500_000,
     expected_chunk_size: int = 10_000,
     expected_tiles: int = 2,
-    expected_dates: int = None
-) -> Iterator[Dict[str, Any]]:
+    expected_dates: int | None = None
+) -> Iterator[dict[str, Any]]:
     """DLT resource for validating processed data.
-    
+
     Args:
         target: What to validate ('raw', 'organized', 'delta', or 'both')
         organized_dir: Directory with organized parquet chunks
-        delta_dir: Directory with Delta Lake tables  
+        delta_dir: Directory with Delta Lake tables
         raw_dir: Directory with raw timeseries data
         expected_total_parcels: Expected total unique parcels
         expected_chunk_size: Expected number of parcels per chunk
         expected_tiles: Expected number of UTM tiles
         expected_dates: Expected number of dates per parcel
-    
+
     Yields:
         Dict with validation results and statistics
     """
-    
+
     typer.echo("=== DLT STAGE: DATA VALIDATION ===")
-    
+
     try:
         # Capture validation results by temporarily modifying the validate function
         # to return results instead of just printing
-        from lake_sandbox.validator.raw import validate_raw_timeseries
-        from lake_sandbox.validator.organized import validate_organized_chunks
         from lake_sandbox.validator.delta import validate_delta_tables
-        
+        from lake_sandbox.validator.organized import validate_organized_chunks
+        from lake_sandbox.validator.raw import validate_raw_timeseries
+
         validation_results = {}
-        
+
         # Run validation based on target
         if target == "raw":
             raw_result = validate_raw_timeseries(
@@ -63,7 +63,7 @@ def validation_resource(
                 "issues": raw_result.issues,
                 "error": getattr(raw_result, 'error', None)
             }
-            
+
         elif target in ["organized", "both"]:
             organized_result = validate_organized_chunks(
                 organized_dir=organized_dir,
@@ -81,7 +81,7 @@ def validation_resource(
                 "issues": organized_result.issues,
                 "error": getattr(organized_result, 'error', None)
             }
-        
+
         if target in ["delta", "both"]:
             delta_result = validate_delta_tables(
                 delta_dir=delta_dir,
@@ -95,11 +95,12 @@ def validation_resource(
                 "issues": delta_result.issues,
                 "error": getattr(delta_result, 'error', None)
             }
-        
+
         # Determine overall validation status
         all_valid = all(result["valid"] for result in validation_results.values())
-        total_issues = sum(len(result["issues"]) for result in validation_results.values())
-        
+        total_issues = sum(
+            len(result["issues"]) for result in validation_results.values())
+
         yield {
             "stage": "validation",
             "status": "completed",
@@ -119,7 +120,7 @@ def validation_resource(
                 "dates": expected_dates
             }
         }
-        
+
     except Exception as e:
         yield {
             "stage": "validation",
@@ -128,7 +129,7 @@ def validation_resource(
             "target": target,
             "directories": {
                 "raw_dir": raw_dir,
-                "organized_dir": organized_dir, 
+                "organized_dir": organized_dir,
                 "delta_dir": delta_dir
             }
         }
@@ -139,15 +140,15 @@ def create_validation_pipeline(
     destination: str = "duckdb"
 ) -> dlt.Pipeline:
     """Create a DLT pipeline for data validation.
-    
+
     Args:
         pipeline_name: Name of the pipeline
         destination: DLT destination (parquet, filesystem, etc.)
-    
+
     Returns:
         Configured DLT pipeline
     """
-    
+
     return dlt.pipeline(
         pipeline_name=pipeline_name,
         destination=destination,

@@ -42,7 +42,7 @@ def validate(
         "--tiles",
         help="Expected number of UTM tiles (affects duplicate detection)"
     ),
-    expected_dates: int = typer.Option(
+    expected_dates: int | None = typer.Option(
         None,
         "--expected-dates",
         help="Expected number of dates per parcel (None = auto-detect from data)"
