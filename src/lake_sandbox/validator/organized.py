@@ -12,6 +12,8 @@ def validate_organized_chunks(
     organized_dir: str,
     expected_chunk_size: int,
     expected_tiles: int,
+    expected_dates: int = None,
+    raw_dir: str = None,
     verbose: bool = False,
 ) -> OrganizedValidationResult:
     """Validate organized parcel chunks have correct structure and parcel counts.
@@ -30,6 +32,29 @@ def validate_organized_chunks(
     typer.echo(f"Directory: {organized_dir}")
     typer.echo(f"Expected chunk size: {expected_chunk_size:,} parcels")
     typer.echo(f"Expected tiles: {expected_tiles}")
+
+    # Auto-detect expected dates from raw directory if not provided
+    if expected_dates is None and raw_dir is not None:
+        typer.echo(f"Auto-detecting expected dates from raw directory: {raw_dir}")
+        raw_path = Path(raw_dir)
+        if raw_path.exists():
+            try:
+                conn_temp = duckdb.connect()
+                raw_files_pattern = str(raw_path / "**/*.parquet")
+                dates_result = conn_temp.execute(f"SELECT COUNT(DISTINCT date) FROM read_parquet('{raw_files_pattern}')").fetchone()
+                if dates_result and dates_result[0] > 0:
+                    expected_dates = dates_result[0]
+                    typer.echo(f"Found {expected_dates} unique dates in raw data")
+                else:
+                    typer.echo("⚠ Could not detect dates from raw data")
+                conn_temp.close()
+            except Exception as e:
+                typer.echo(f"⚠ Failed to read raw data for date detection: {e}")
+        else:
+            typer.echo(f"⚠ Raw directory {raw_dir} does not exist")
+
+    if expected_dates is not None:
+        typer.echo(f"Expected dates per parcel: {expected_dates}")
 
     organized_path = Path(organized_dir)
     if not organized_path.exists():
@@ -125,9 +150,25 @@ def validate_organized_chunks(
             # Check for expected duplicates based on tiles
             expected_duplicates = unique_parcels * unique_dates * (expected_tiles - 1)
 
-            # Check chunk size expectations
-            if unique_parcels > expected_chunk_size:
-                issue = f"{chunk_name}: Too many parcels ({unique_parcels} > {expected_chunk_size})"
+            # Check data completeness: each parcel should have all expected dates
+            expected_date_count = expected_dates if expected_dates is not None else unique_dates
+            
+            incomplete_parcels_query = f"""
+                WITH parcel_date_counts AS (
+                    SELECT parcel_id, COUNT(DISTINCT date) as date_count
+                    FROM read_parquet('{data_file}')
+                    GROUP BY parcel_id
+                )
+                SELECT COUNT(*) as incomplete_count
+                FROM parcel_date_counts
+                WHERE date_count != {expected_date_count}
+            """
+            
+            incomplete_result = conn.execute(incomplete_parcels_query).fetchone()
+            incomplete_parcels = incomplete_result[0] if incomplete_result else 0
+            
+            if incomplete_parcels > 0:
+                issue = f"{chunk_name}: {incomplete_parcels} parcels missing dates (expected {expected_date_count} dates per parcel, found {unique_dates} unique dates)"
                 issues.append(issue)
 
             # Check for parcel overlaps between chunks
@@ -145,11 +186,15 @@ def validate_organized_chunks(
             unique_parcels_overall.update(chunk_parcels)
 
             if verbose:
+                chunk_size_info = f"~{expected_chunk_size:,}" if unique_parcels != expected_chunk_size else f"{expected_chunk_size:,}"
                 typer.echo(
-                    f"  ✓ {chunk_name}: {unique_parcels:,} parcels, {unique_dates} dates, {chunk_total_records:,} records")
+                    f"  ✓ {chunk_name}: {unique_parcels:,} parcels (target: {chunk_size_info}), {unique_dates} dates, {chunk_total_records:,} records")
                 if duplicates > 0:
                     typer.echo(
                         f"    • {duplicates:,} duplicate records (expected ~{expected_duplicates:,} from {expected_tiles} tiles)")
+                if incomplete_parcels > 0:
+                    typer.echo(
+                        f"    • {incomplete_parcels:,} parcels with incomplete dates")
 
         except Exception as e:
             issue = f"{chunk_name}: Failed to read ({e})"

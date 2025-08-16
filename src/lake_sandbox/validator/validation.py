@@ -42,6 +42,11 @@ def validate(
         "--tiles",
         help="Expected number of UTM tiles (affects duplicate detection)"
     ),
+    expected_dates: int = typer.Option(
+        None,
+        "--expected-dates",
+        help="Expected number of dates per parcel (None = auto-detect from data)"
+    ),
     verbose: bool = typer.Option(
         False,
         "--verbose",
@@ -67,6 +72,8 @@ def validate(
             organized_dir=organized_dir,
             expected_chunk_size=expected_chunk_size,
             expected_tiles=expected_tiles,
+            expected_dates=expected_dates,
+            raw_dir=raw_dir,
             verbose=verbose
         )
 
