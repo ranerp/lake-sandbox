@@ -6,8 +6,9 @@ import typer
 from deltalake import DeltaTable
 
 
-def validate_delta_table(delta_table_path: Path) -> tuple[
-    bool, DeltaTable | None, str | None]:
+def validate_delta_table(
+    delta_table_path: Path,
+) -> tuple[bool, DeltaTable | None, str | None]:
     """Validate a Delta Lake table exists and is accessible.
 
     Args:
@@ -24,7 +25,6 @@ def validate_delta_table(delta_table_path: Path) -> tuple[
 
     try:
         dt = DeltaTable(str(delta_table_path))
-        version = dt.version()
         file_count = len(dt.files())
 
         if file_count == 0:
@@ -53,9 +53,9 @@ def get_delta_partitions(dt: DeltaTable) -> set[str]:
     return partitions
 
 
-def check_existing_delta_partition(delta_table_path: Path,
-                                   partition: str,
-                                   force: bool = False) -> tuple[bool, dict[str, int]]:
+def check_existing_delta_partition(
+    delta_table_path: Path, partition: str, force: bool = False
+) -> tuple[bool, dict[str, int]]:
     """Check if a Delta partition already exists and should be skipped.
 
     Args:
@@ -83,9 +83,9 @@ def check_existing_delta_partition(delta_table_path: Path,
     return False, {}
 
 
-def verify_delta_streaming(chunk_name: str,
-                           records_streamed: int,
-                           delta_table_path: Path) -> dict[str, int]:
+def verify_delta_streaming(
+    chunk_name: str, records_streamed: int, delta_table_path: Path
+) -> dict[str, int]:
     """Verify that streaming to Delta table was successful.
 
     Args:
@@ -104,7 +104,8 @@ def verify_delta_streaming(chunk_name: str,
 
     if records_streamed > 0:
         typer.echo(
-            f"  ✓ Streamed {records_streamed:,} rows from {chunk_name} to Delta table")
+            f"  ✓ Streamed {records_streamed:,} rows from {chunk_name} to Delta table"
+        )
         return {"processed": 1}
     else:
         typer.echo(f"  ⚠ Streamed {chunk_name} but no rows were added")

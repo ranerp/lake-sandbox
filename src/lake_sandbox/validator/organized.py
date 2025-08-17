@@ -44,7 +44,8 @@ def validate_organized_chunks(
                 conn_temp = duckdb.connect()
                 raw_files_pattern = str(raw_path / "**/*.parquet")
                 dates_result = conn_temp.execute(
-                    f"SELECT COUNT(DISTINCT date) FROM read_parquet('{raw_files_pattern}')").fetchone()
+                    f"SELECT COUNT(DISTINCT date) FROM read_parquet('{raw_files_pattern}')"
+                ).fetchone()
                 if dates_result and dates_result[0] > 0:
                     expected_dates = dates_result[0]
                     typer.echo(f"Found {expected_dates} unique dates in raw data")
@@ -69,12 +70,15 @@ def validate_organized_chunks(
             total_unique_parcels=0,
             total_records=0,
             issues=[],
-            error="Directory not found"
+            error="Directory not found",
         )
 
     # Find all parcel chunk directories
-    chunk_dirs = [d for d in organized_path.iterdir() if
-                  d.is_dir() and d.name.startswith("parcel_chunk=")]
+    chunk_dirs = [
+        d
+        for d in organized_path.iterdir()
+        if d.is_dir() and d.name.startswith("parcel_chunk=")
+    ]
     if not chunk_dirs:
         typer.echo("Error: No parcel_chunk directories found")
         return OrganizedValidationResult(
@@ -84,7 +88,7 @@ def validate_organized_chunks(
             total_unique_parcels=0,
             total_records=0,
             issues=[],
-            error="No chunks found"
+            error="No chunks found",
         )
 
     typer.echo(f"Found {len(chunk_dirs)} parcel chunks")
@@ -130,12 +134,22 @@ def validate_organized_chunks(
             result = conn.execute(stats_query).fetchone()
             if result is None:
                 raise ValueError("Query returned no results")
-            chunk_total_records, unique_parcels, unique_dates, min_date, max_date, duplicates = result
+            (
+                chunk_total_records,
+                unique_parcels,
+                unique_dates,
+                min_date,
+                max_date,
+                duplicates,
+            ) = result
 
             # Get sample parcel IDs to check for overlaps
-            sample_parcels_query = f"SELECT DISTINCT parcel_id FROM read_parquet('{data_file}') LIMIT 10"
-            sample_parcels = [row[0] for row in
-                              conn.execute(sample_parcels_query).fetchall()]
+            sample_parcels_query = (
+                f"SELECT DISTINCT parcel_id FROM read_parquet('{data_file}') LIMIT 10"
+            )
+            sample_parcels = [
+                row[0] for row in conn.execute(sample_parcels_query).fetchall()
+            ]
 
             chunk_detail = ChunkDetail(
                 chunk_name=chunk_name,
@@ -144,7 +158,7 @@ def validate_organized_chunks(
                 unique_dates=unique_dates,
                 date_range=f"{min_date} to {max_date}",
                 duplicate_records=duplicates,
-                sample_parcels=sample_parcels[:5]  # First 5 for display
+                sample_parcels=sample_parcels[:5],  # First 5 for display
             )
 
             chunk_details.append(chunk_detail)
@@ -154,7 +168,9 @@ def validate_organized_chunks(
             expected_duplicates = unique_parcels * unique_dates * (expected_tiles - 1)
 
             # Check data completeness: each parcel should have all expected dates
-            expected_date_count = expected_dates if expected_dates is not None else unique_dates
+            expected_date_count = (
+                expected_dates if expected_dates is not None else unique_dates
+            )
 
             incomplete_parcels_query = f"""
                 WITH parcel_date_counts AS (
@@ -175,8 +191,11 @@ def validate_organized_chunks(
                 issues.append(issue)
 
             # Check for parcel overlaps between chunks
-            chunk_parcels = set(conn.execute(
-                f"SELECT DISTINCT parcel_id FROM read_parquet('{data_file}')").fetchall())
+            chunk_parcels = set(
+                conn.execute(
+                    f"SELECT DISTINCT parcel_id FROM read_parquet('{data_file}')"
+                ).fetchall()
+            )
             chunk_parcels = {p[0] for p in chunk_parcels}
 
             overlap = unique_parcels_overall.intersection(chunk_parcels)
@@ -189,15 +208,22 @@ def validate_organized_chunks(
             unique_parcels_overall.update(chunk_parcels)
 
             if verbose:
-                chunk_size_info = f"~{expected_chunk_size:,}" if unique_parcels != expected_chunk_size else f"{expected_chunk_size:,}"
+                chunk_size_info = (
+                    f"~{expected_chunk_size:,}"
+                    if unique_parcels != expected_chunk_size
+                    else f"{expected_chunk_size:,}"
+                )
                 typer.echo(
-                    f"  ✓ {chunk_name}: {unique_parcels:,} parcels (target: {chunk_size_info}), {unique_dates} dates, {chunk_total_records:,} records")
+                    f"  ✓ {chunk_name}: {unique_parcels:,} parcels (target: {chunk_size_info}), {unique_dates} dates, {chunk_total_records:,} records"
+                )
                 if duplicates > 0:
                     typer.echo(
-                        f"    • {duplicates:,} duplicate records (expected ~{expected_duplicates:,} from {expected_tiles} tiles)")
+                        f"    • {duplicates:,} duplicate records (expected ~{expected_duplicates:,} from {expected_tiles} tiles)"
+                    )
                 if incomplete_parcels > 0:
                     typer.echo(
-                        f"    • {incomplete_parcels:,} parcels with incomplete dates")
+                        f"    • {incomplete_parcels:,} parcels with incomplete dates"
+                    )
 
         except Exception as e:
             issue = f"{chunk_name}: Failed to read ({e})"
@@ -231,5 +257,5 @@ def validate_organized_chunks(
         chunk_details=chunk_details,
         total_unique_parcels=total_unique_parcels,
         total_records=total_records,
-        issues=issues
+        issues=issues,
     )

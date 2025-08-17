@@ -42,7 +42,7 @@ def validate_raw_timeseries(
             total_unique_parcels=0,
             total_records=0,
             issues=[],
-            error="Directory not found"
+            error="Directory not found",
         )
 
     # Find all parquet files in the directory structure
@@ -57,7 +57,7 @@ def validate_raw_timeseries(
             total_unique_parcels=0,
             total_records=0,
             issues=[],
-            error="No parquet files found"
+            error="No parquet files found",
         )
 
     typer.echo(f"Found {len(parquet_files)} parquet files")
@@ -76,8 +76,9 @@ def validate_raw_timeseries(
         utm_tile = next((p for p in parts if p.startswith("utm_tile=")), "unknown")
         year = next((p for p in parts if p.startswith("year=")), "unknown")
         date_name = next((p for p in parts if p.startswith("date=")), "unknown")
-        date_value = date_name.replace("date=",
-                                       "") if date_name != "unknown" else "unknown"
+        date_value = (
+            date_name.replace("date=", "") if date_name != "unknown" else "unknown"
+        )
 
         relative_path = str(data_file.relative_to(raw_path))
 
@@ -98,26 +99,30 @@ def validate_raw_timeseries(
 
             # Check date consistency within partition
             data_consistent = date_value == "unknown" or (
-                str(min_date) == date_value and str(max_date) == date_value)
+                str(min_date) == date_value and str(max_date) == date_value
+            )
             if date_value != "unknown" and not data_consistent:
                 issue = f"{relative_path}: Date inconsistency - partition={date_value}, data range={min_date} to {max_date}"
                 issues.append(issue)
 
             # Get parcel IDs for this file
-            parcels_query = f"SELECT DISTINCT parcel_id FROM read_parquet('{data_file}')"
+            parcels_query = (
+                f"SELECT DISTINCT parcel_id FROM read_parquet('{data_file}')"
+            )
             file_parcels = {row[0] for row in conn.execute(parcels_query).fetchall()}
 
             file_detail = FileDetail(
                 file_path=relative_path,
-                utm_tile=utm_tile.replace("utm_tile=",
-                                          "") if utm_tile != "unknown" else utm_tile,
+                utm_tile=utm_tile.replace("utm_tile=", "")
+                if utm_tile != "unknown"
+                else utm_tile,
                 year=year.replace("year=", "") if year != "unknown" else year,
                 date_partition=date_name,
                 date_value=date_value,
                 total_records=file_total_records,
                 unique_parcels=unique_parcels,
                 date_range=f"{min_date} to {max_date}",
-                data_consistent=data_consistent
+                data_consistent=data_consistent,
             )
 
             file_details.append(file_detail)
@@ -130,7 +135,8 @@ def validate_raw_timeseries(
             if verbose:
                 status = "✓" if file_detail.data_consistent else "✗"
                 typer.echo(
-                    f"  {status} {relative_path}: {unique_parcels:,} parcels, {file_total_records:,} records")
+                    f"  {status} {relative_path}: {unique_parcels:,} parcels, {file_total_records:,} records"
+                )
                 if not file_detail.data_consistent:
                     typer.echo(f"    ⚠ Date range mismatch: {min_date} to {max_date}")
 
@@ -160,7 +166,7 @@ def validate_raw_timeseries(
             min_parcels_per_file=min_parcels,
             max_parcels_per_file=max_parcels,
             avg_parcels_per_file=round(avg_parcels),
-            consistent_across_files=min_parcels == max_parcels
+            consistent_across_files=min_parcels == max_parcels,
         )
 
         # Check if all files have the same number of parcels (they should for properly generated data)
@@ -177,7 +183,8 @@ def validate_raw_timeseries(
 
     if parcel_distribution:
         typer.echo(
-            f"Parcels per file: {parcel_distribution.min_parcels_per_file:,} - {parcel_distribution.max_parcels_per_file:,} (avg: {parcel_distribution.avg_parcels_per_file:,})")
+            f"Parcels per file: {parcel_distribution.min_parcels_per_file:,} - {parcel_distribution.max_parcels_per_file:,} (avg: {parcel_distribution.avg_parcels_per_file:,})"
+        )
 
     # Determine overall validity
     valid = len(issues) == 0
@@ -196,5 +203,5 @@ def validate_raw_timeseries(
         total_unique_parcels=total_unique_parcels,
         total_records=total_records,
         issues=issues,
-        parcel_distribution=parcel_distribution
+        parcel_distribution=parcel_distribution,
     )

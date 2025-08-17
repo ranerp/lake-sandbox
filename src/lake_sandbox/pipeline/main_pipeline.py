@@ -19,21 +19,18 @@ def run_full_pipeline(
     start_date: str = "2024-01-01",
     end_date: str = "2024-04-15",
     tiles: str = "32TNR,32TPR",
-
     # Reorganization parameters
     organized_dir: str = "./output/timeseries-organized",
     delta_dir: str = "./output/timeseries-delta",
     chunk_size: int = 10_000,
     reorg_phase: str = "all",
     force: bool = False,
-
     # Validation parameters
     validation_target: str = "both",
     expected_dates: int | None = None,
-
     # Pipeline parameters
     pipeline_name: str = "lake_sandbox_full_pipeline",
-    destination: str = "duckdb"
+    destination: str = "duckdb",
 ) -> dict[str, Any]:
     """Run the complete lake-sandbox pipeline: generate -> reorganize -> validate.
 
@@ -79,14 +76,14 @@ def run_full_pipeline(
     pipeline = dlt.pipeline(
         pipeline_name=pipeline_name,
         destination=destination,
-        dataset_name="lake_sandbox"
+        dataset_name="lake_sandbox",
     )
 
     pipeline_results: dict[str, Any] = {
         "pipeline_name": pipeline_name,
         "stages_completed": [],
         "stages_failed": [],
-        "overall_status": "running"
+        "overall_status": "running",
     }
 
     try:
@@ -97,7 +94,7 @@ def run_full_pipeline(
             utm_tiles=tiles,
             start_date=start_date,
             end_date=end_date,
-            num_parcels=total_parcels
+            num_parcels=total_parcels,
         )
         load_info = pipeline.run(timeseries_data)
         typer.echo(f"Timeseries generation completed: {load_info}")
@@ -111,7 +108,7 @@ def run_full_pipeline(
             delta_dir=delta_dir,
             chunk_size=chunk_size,
             phase=reorg_phase,
-            force=force
+            force=force,
         )
         load_info = pipeline.run(reorganization_data)
         typer.echo(f"Reorganization completed: {load_info}")
@@ -127,7 +124,7 @@ def run_full_pipeline(
             expected_total_parcels=total_parcels,
             expected_chunk_size=chunk_size,
             expected_tiles=tiles_count,
-            expected_dates=expected_dates
+            expected_dates=expected_dates,
         )
         load_info = pipeline.run(validation_data)
         typer.echo(f"Validation completed: {load_info}")
@@ -137,7 +134,8 @@ def run_full_pipeline(
         pipeline_results["overall_status"] = "completed"
         typer.echo("\nPIPELINE COMPLETED SUCCESSFULLY!")
         typer.echo(
-            f"Stages completed: {', '.join(pipeline_results['stages_completed'])}")
+            f"Stages completed: {', '.join(pipeline_results['stages_completed'])}"
+        )
 
         return pipeline_results
 
@@ -163,35 +161,35 @@ def run_pipeline_cli(
     tiles: str = typer.Option(
         "32TNR,32TPR", "--utm-tiles", help="Comma-separated UTM tile identifiers"
     ),
-
     # Directory options
     output_dir: str = typer.Option(
         "./output/timeseries-raw", "--output-dir", help="Raw data output directory"
     ),
     organized_dir: str = typer.Option(
-        "./output/timeseries-organized", "--organized-dir",
-        help="Organized data directory"
+        "./output/timeseries-organized",
+        "--organized-dir",
+        help="Organized data directory",
     ),
     delta_dir: str = typer.Option(
         "./output/timeseries-delta", "--delta-dir", help="Delta Lake directory"
     ),
-
     # Processing options
     chunk_size: int = typer.Option(
         10_000, "--chunk-size", help="Number of parcels per chunk"
     ),
     reorg_phase: str = typer.Option(
-        "all", "--reorg-phase",
-        help="Reorganization phase ('reorg', 'delta', 'optimize', 'all')"
+        "all",
+        "--reorg-phase",
+        help="Reorganization phase ('reorg', 'delta', 'optimize', 'all')",
     ),
     validation_target: str = typer.Option(
-        "both", "--validation-target",
-        help="Validation target ('raw', 'organized', 'delta', 'both')"
+        "both",
+        "--validation-target",
+        help="Validation target ('raw', 'organized', 'delta', 'both')",
     ),
     expected_dates: int | None = typer.Option(
         None, "--expected-dates", help="Expected number of dates per parcel"
     ),
-
     # Pipeline control
     force: bool = typer.Option(
         False, "--force", help="Force reprocessing of existing files"
@@ -199,9 +197,7 @@ def run_pipeline_cli(
     pipeline_name: str = typer.Option(
         "lake_sandbox_pipeline", "--pipeline-name", help="DLT pipeline name"
     ),
-    destination: str = typer.Option(
-        "duckdb", "--destination", help="DLT destination"
-    )
+    destination: str = typer.Option("duckdb", "--destination", help="DLT destination"),
 ) -> None:
     """Run the complete lake-sandbox data pipeline using DLT."""
 
@@ -212,19 +208,16 @@ def run_pipeline_cli(
         start_date=start_date,
         end_date=end_date,
         tiles=tiles,
-
         # Reorganization
         organized_dir=organized_dir,
         delta_dir=delta_dir,
         chunk_size=chunk_size,
         reorg_phase=reorg_phase,
         force=force,
-
         # Validation
         validation_target=validation_target,
         expected_dates=expected_dates,
-
         # Pipeline
         pipeline_name=pipeline_name,
-        destination=destination
+        destination=destination,
     )

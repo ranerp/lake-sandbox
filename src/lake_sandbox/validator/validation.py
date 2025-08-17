@@ -10,48 +10,41 @@ def validate(
         "both",
         "--target",
         "-t",
-        help="What to validate: 'raw', 'organized', 'delta', or 'both' (organized+delta)"
+        help="What to validate: 'raw', 'organized', 'delta', or 'both' (organized+delta)",
     ),
     organized_dir: str = typer.Option(
         "./output/timeseries-organized",
         "--organized-dir",
-        help="Directory with organized parquet chunks"
+        help="Directory with organized parquet chunks",
     ),
     delta_dir: str = typer.Option(
         "./output/timeseries-delta",
         "--delta-dir",
-        help="Directory with Delta Lake tables"
+        help="Directory with Delta Lake tables",
     ),
     raw_dir: str = typer.Option(
         "./output/timeseries-raw",
         "--raw-dir",
-        help="Directory with raw timeseries data partitioned by date"
+        help="Directory with raw timeseries data partitioned by date",
     ),
     expected_total_parcels: int = typer.Option(
         500_000,
         "--total-parcels",
-        help="Expected total unique parcels across all dates"
+        help="Expected total unique parcels across all dates",
     ),
     expected_chunk_size: int = typer.Option(
-        10_000,
-        "--chunk-size",
-        help="Expected number of parcels per chunk"
+        10_000, "--chunk-size", help="Expected number of parcels per chunk"
     ),
     expected_tiles: int = typer.Option(
-        2,
-        "--tiles",
-        help="Expected number of UTM tiles (affects duplicate detection)"
+        2, "--tiles", help="Expected number of UTM tiles (affects duplicate detection)"
     ),
     expected_dates: int | None = typer.Option(
         None,
         "--expected-dates",
-        help="Expected number of dates per parcel (None = auto-detect from data)"
+        help="Expected number of dates per parcel (None = auto-detect from data)",
     ),
     verbose: bool = typer.Option(
-        False,
-        "--verbose",
-        "-v",
-        help="Show detailed validation information"
+        False, "--verbose", "-v", help="Show detailed validation information"
     ),
 ) -> None:
     """Validate organized chunks and/or Delta tables for data integrity."""
@@ -65,7 +58,7 @@ def validate(
         results["raw"] = validate_raw_timeseries(
             raw_dir=raw_dir,
             expected_total_parcels=expected_total_parcels,
-            verbose=verbose
+            verbose=verbose,
         )
     elif target in ["organized", "both"]:
         results["organized"] = validate_organized_chunks(
@@ -74,14 +67,12 @@ def validate(
             expected_tiles=expected_tiles,
             expected_dates=expected_dates,
             raw_dir=raw_dir,
-            verbose=verbose
+            verbose=verbose,
         )
 
     if target in ["delta", "both"]:
         results["delta"] = validate_delta_tables(
-            delta_dir=delta_dir,
-            verbose=verbose,
-            organized_dir=organized_dir
+            delta_dir=delta_dir, verbose=verbose, organized_dir=organized_dir
         )
 
     # Overall summary

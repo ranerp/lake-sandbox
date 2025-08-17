@@ -12,8 +12,7 @@ from rich.table import Table
 from lake_sandbox.utils.performance import monitor_performance
 
 
-def connect_to_deltalake(
-    delta_dir: str = "./output/timeseries-delta") -> duckdb.DuckDBPyConnection:
+def connect_to_deltalake() -> duckdb.DuckDBPyConnection:
     """Connect to DeltaLake data using DuckDB."""
     conn = duckdb.connect()
 
@@ -60,14 +59,14 @@ def get_dataset_summary(conn: duckdb.DuckDBPyConnection, delta_dir: str) -> dict
         "avg_ndvi": result[6],
         "avg_evi": result[7],
         "avg_temperature": result[8],
-        "avg_precipitation": result[9]
+        "avg_precipitation": result[9],
     }
 
 
 @monitor_performance()
-def get_random_parcel_timeseries(conn: duckdb.DuckDBPyConnection,
-                                 delta_dir: str,
-                                 parcel_id: str | None = None) -> pd.DataFrame:
+def get_random_parcel_timeseries(
+    conn: duckdb.DuckDBPyConnection, delta_dir: str, parcel_id: str | None = None
+) -> pd.DataFrame:
     """Get timeseries data for a specific or random parcel."""
     delta_path = Path(delta_dir).absolute()
     delta_table_path = delta_path / "parcel_data"
@@ -127,8 +126,9 @@ def get_random_parcel_timeseries(conn: duckdb.DuckDBPyConnection,
 
 def display_dataset_summary(summary: dict, console: Console):
     """Display dataset summary in a formatted table."""
-    table = Table(title="Dataset Summary", show_header=True,
-                  header_style="bold magenta")
+    table = Table(
+        title="Dataset Summary", show_header=True, header_style="bold magenta"
+    )
     table.add_column("Metric", style="cyan", width=20)
     table.add_column("Value", style="green", width=20)
 
@@ -147,16 +147,21 @@ def display_dataset_summary(summary: dict, console: Console):
 
 def display_parcel_timeseries(df: pd.DataFrame, console: Console):
     """Display parcel timeseries data in a formatted table."""
-    parcel_id = df['parcel_id'].iloc[0]
-    parcel_chunk = df['parcel_chunk'].iloc[0]
+    parcel_id = df["parcel_id"].iloc[0]
+    parcel_chunk = df["parcel_chunk"].iloc[0]
 
     # Parcel info
-    info_text = f"Parcel ID: {parcel_id}\nPartition: {parcel_chunk}\nObservations: {len(df)}"
+    info_text = (
+        f"Parcel ID: {parcel_id}\nPartition: {parcel_chunk}\nObservations: {len(df)}"
+    )
     console.print(Panel(info_text, title="Parcel Information", style="blue"))
 
     # Timeseries table
-    table = Table(title=f"Timeseries Data for Parcel {parcel_id}", show_header=True,
-                  header_style="bold green")
+    table = Table(
+        title=f"Timeseries Data for Parcel {parcel_id}",
+        show_header=True,
+        header_style="bold green",
+    )
     table.add_column("Date", style="cyan", width=12)
     table.add_column("NDVI", style="green", width=8)
     table.add_column("EVI", style="blue", width=8)
@@ -167,30 +172,34 @@ def display_parcel_timeseries(df: pd.DataFrame, console: Console):
 
     for _, row in df.iterrows():
         table.add_row(
-            str(row['date'].date()) if pd.notna(row['date']) else "N/A",
+            str(row["date"].date()) if pd.notna(row["date"]) else "N/A",
             f"{row['ndvi']:.3f}",
             f"{row['evi']:.3f}",
             f"{row['temperature']:.1f}",
             f"{row['precipitation']:.1f}",
             f"{row['cloud_cover']:.1f}",
-            f"{row['geometry_area']:.1f}"
+            f"{row['geometry_area']:.1f}",
         )
 
     console.print(table)
 
     # Summary statistics for this parcel
-    stats_table = Table(title="Parcel Statistics", show_header=True,
-                        header_style="bold yellow")
+    stats_table = Table(
+        title="Parcel Statistics", show_header=True, header_style="bold yellow"
+    )
     stats_table.add_column("Metric", style="cyan")
     stats_table.add_column("Value", style="green")
 
-    stats_table.add_row("NDVI Range",
-                        f"{df['ndvi'].min():.3f} - {df['ndvi'].max():.3f}")
+    stats_table.add_row(
+        "NDVI Range", f"{df['ndvi'].min():.3f} - {df['ndvi'].max():.3f}"
+    )
     stats_table.add_row("NDVI Mean", f"{df['ndvi'].mean():.3f}")
     stats_table.add_row("EVI Range", f"{df['evi'].min():.3f} - {df['evi'].max():.3f}")
     stats_table.add_row("EVI Mean", f"{df['evi'].mean():.3f}")
-    stats_table.add_row("Temp Range",
-                        f"{df['temperature'].min():.1f}°C - {df['temperature'].max():.1f}°C")
+    stats_table.add_row(
+        "Temp Range",
+        f"{df['temperature'].min():.1f}°C - {df['temperature'].max():.1f}°C",
+    )
     stats_table.add_row("Total Precipitation", f"{df['precipitation'].sum():.1f}mm")
     stats_table.add_row("Avg Cloud Cover", f"{df['cloud_cover'].mean():.1f}%")
 
@@ -199,17 +208,18 @@ def display_parcel_timeseries(df: pd.DataFrame, console: Console):
 
 def query_parcel(
     delta_dir: str = typer.Option(
-        "output/timeseries-delta", "--delta-dir",
-        help="Path to Delta Lake data directory"
+        "output/timeseries-delta",
+        "--delta-dir",
+        help="Path to Delta Lake data directory",
     ),
     parcel_id: str | None = typer.Option(
-        None, "--parcel-id",
-        help="Specific parcel ID to query (if not provided, random parcel will be selected)"
+        None,
+        "--parcel-id",
+        help="Specific parcel ID to query (if not provided, random parcel will be selected)",
     ),
     show_summary: bool = typer.Option(
-        True, "--show-summary/--no-summary",
-        help="Show dataset summary statistics"
-    )
+        True, "--show-summary/--no-summary", help="Show dataset summary statistics"
+    ),
 ) -> None:
     """Query and display a single parcel timeseries from Delta Lake data.
 
@@ -236,7 +246,7 @@ def query_parcel(
     try:
         # Connect to Delta Lake
         console.print(f"Connecting to Delta Lake at: {delta_dir}")
-        conn = connect_to_deltalake(delta_dir)
+        conn = connect_to_deltalake()
 
         # Show dataset summary if requested
         if show_summary:
@@ -261,7 +271,7 @@ def query_parcel(
 
     except Exception as e:
         console.print(f"Error during query: {e}", style="bold red")
-        raise typer.Exit(1)
+        raise typer.Exit(1) from e
 
 
 if __name__ == "__main__":

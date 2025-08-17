@@ -19,7 +19,7 @@ def reorganization_resource(
     delta_dir: str = "./output/timeseries-delta",
     chunk_size: int = 10_000,
     phase: str = "all",
-    force: bool = False
+    force: bool = False,
 ) -> Iterator[dict[str, Any]]:
     """DLT resource for reorganizing timeseries data.
 
@@ -60,7 +60,7 @@ def reorganization_resource(
             phase=phase,
             force=force,
             dry_run=False,
-            status=False
+            status=False,
         )
 
         # Verify outputs
@@ -71,13 +71,22 @@ def reorganization_resource(
         delta_tables = 0
 
         if organized_path.exists():
-            organized_chunks = len([d for d in organized_path.iterdir()
-                                    if
-                                    d.is_dir() and d.name.startswith("parcel_chunk=")])
+            organized_chunks = len(
+                [
+                    d
+                    for d in organized_path.iterdir()
+                    if d.is_dir() and d.name.startswith("parcel_chunk=")
+                ]
+            )
 
         if delta_path.exists():
-            delta_tables = len([d for d in delta_path.iterdir()
-                                if d.is_dir() and d.name.startswith("parcel_chunk=")])
+            delta_tables = len(
+                [
+                    d
+                    for d in delta_path.iterdir()
+                    if d.is_dir() and d.name.startswith("parcel_chunk=")
+                ]
+            )
 
         yield {
             "stage": "reorganization",
@@ -90,7 +99,7 @@ def reorganization_resource(
             "input_files": input_file_count,
             "organized_chunks": organized_chunks,
             "delta_tables": delta_tables,
-            "force_used": force
+            "force_used": force,
         }
 
     except Exception as e:
@@ -101,13 +110,12 @@ def reorganization_resource(
             "input_dir": input_dir,
             "output_dir": output_dir,
             "delta_dir": delta_dir,
-            "phase": phase
+            "phase": phase,
         }
 
 
 def create_reorganization_pipeline(
-    pipeline_name: str = "reorganization_pipeline",
-    destination: str = "duckdb"
+    pipeline_name: str = "reorganization_pipeline", destination: str = "duckdb"
 ) -> dlt.Pipeline:
     """Create a DLT pipeline for data reorganization.
 
@@ -122,5 +130,5 @@ def create_reorganization_pipeline(
     return dlt.pipeline(
         pipeline_name=pipeline_name,
         destination=destination,
-        dataset_name="lake_sandbox_reorganization"
+        dataset_name="lake_sandbox_reorganization",
     )

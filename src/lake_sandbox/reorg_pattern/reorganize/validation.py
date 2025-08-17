@@ -6,8 +6,9 @@ import duckdb
 import typer
 
 
-def validate_parquet_file(file_path: Path, conn: duckdb.DuckDBPyConnection) -> tuple[
-    bool, int, str | None]:
+def validate_parquet_file(
+    file_path: Path, conn: duckdb.DuckDBPyConnection
+) -> tuple[bool, int, str | None]:
     """Validate a parquet file exists and contains data.
 
     Args:
@@ -25,7 +26,8 @@ def validate_parquet_file(file_path: Path, conn: duckdb.DuckDBPyConnection) -> t
 
     try:
         result = conn.execute(
-            f"SELECT COUNT(*) FROM read_parquet('{file_path}')").fetchone()
+            f"SELECT COUNT(*) FROM read_parquet('{file_path}')"
+        ).fetchone()
         if result is None:
             return False, 0, "Query returned no results"
 
@@ -39,10 +41,12 @@ def validate_parquet_file(file_path: Path, conn: duckdb.DuckDBPyConnection) -> t
         return False, 0, str(e)
 
 
-def check_existing_chunk(chunk_file: Path,
-                         chunk_id: str,
-                         conn: duckdb.DuckDBPyConnection,
-                         force: bool = False) -> tuple[bool, dict[str, int]]:
+def check_existing_chunk(
+    chunk_file: Path,
+    chunk_id: str,
+    conn: duckdb.DuckDBPyConnection,
+    force: bool = False,
+) -> tuple[bool, dict[str, int]]:
     """Check if an existing chunk should be skipped or recreated.
 
     Args:
@@ -71,14 +75,15 @@ def check_existing_chunk(chunk_file: Path,
         typer.echo(f"  ⚠ Existing chunk {chunk_id} is empty, recreating...")
     else:
         typer.echo(
-            f"  ⚠ Existing chunk {chunk_id} is corrupted ({error}), recreating...")
+            f"  ⚠ Existing chunk {chunk_id} is corrupted ({error}), recreating..."
+        )
 
     return False, {}
 
 
-def verify_file_creation(chunk_file: Path,
-                         chunk_id: str,
-                         conn: duckdb.DuckDBPyConnection) -> dict[str, int]:
+def verify_file_creation(
+    chunk_file: Path, chunk_id: str, conn: duckdb.DuckDBPyConnection
+) -> dict[str, int]:
     """Verify that a file was created successfully and return statistics update.
 
     Args:
@@ -127,8 +132,11 @@ def get_valid_chunks(output_dir: str, conn: duckdb.DuckDBPyConnection) -> list:
     if not output_path.exists():
         return []
 
-    chunk_dirs = [d for d in output_path.iterdir() if
-                  d.is_dir() and d.name.startswith("parcel_chunk=")]
+    chunk_dirs = [
+        d
+        for d in output_path.iterdir()
+        if d.is_dir() and d.name.startswith("parcel_chunk=")
+    ]
     valid_chunks = []
 
     for chunk_dir in sorted(chunk_dirs):
@@ -136,10 +144,12 @@ def get_valid_chunks(output_dir: str, conn: duckdb.DuckDBPyConnection) -> list:
         is_valid, row_count, _ = validate_parquet_file(data_file, conn)
 
         if is_valid:
-            valid_chunks.append({
-                "chunk_id": chunk_dir.name,
-                "file_path": str(data_file),
-                "row_count": row_count
-            })
+            valid_chunks.append(
+                {
+                    "chunk_id": chunk_dir.name,
+                    "file_path": str(data_file),
+                    "row_count": row_count,
+                }
+            )
 
     return valid_chunks

@@ -75,7 +75,8 @@ def reorganize_by_parcel_chunks(
     # First, get sample data to estimate parcels per file
     sample_file = str(parquet_files[0])
     sample_result = conn.execute(
-        f"SELECT COUNT(*) FROM read_parquet('{sample_file}')").fetchone()
+        f"SELECT COUNT(*) FROM read_parquet('{sample_file}')"
+    ).fetchone()
 
     if sample_result is None:
         raise ValueError("Sample query returned no results")
@@ -171,14 +172,13 @@ def get_reorganization_progress(output_dir: str) -> ReorganizationProgress:
             ChunkFile(
                 chunk_id=chunk["chunk_id"],
                 file_path=chunk["file_path"],
-                row_count=chunk["row_count"]
+                row_count=chunk["row_count"],
             )
             for chunk in valid_chunk_data
         ]
 
         return ReorganizationProgress(
-            existing_chunks=len(valid_chunks),
-            chunk_files=valid_chunks
+            existing_chunks=len(valid_chunks), chunk_files=valid_chunks
         )
     finally:
         conn.close()

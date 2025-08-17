@@ -13,8 +13,7 @@ from rich.text import Text
 from lake_sandbox.utils.performance import monitor_performance
 
 
-def connect_to_deltalake(
-    delta_dir: str = "./output/timeseries-delta") -> duckdb.DuckDBPyConnection:
+def connect_to_deltalake() -> duckdb.DuckDBPyConnection:
     """Connect to DeltaLake data using DuckDB."""
     conn = duckdb.connect()
 
@@ -26,9 +25,9 @@ def connect_to_deltalake(
 
 
 @monitor_performance()
-def get_random_time_window(conn: duckdb.DuckDBPyConnection,
-                           delta_dir: str,
-                           window_days: int = 10) -> tuple[str, str]:
+def get_random_time_window(
+    conn: duckdb.DuckDBPyConnection, delta_dir: str, window_days: int = 10
+) -> tuple[str, str]:
     """Get a random time window of specified days from the dataset."""
     delta_path = Path(delta_dir).absolute()
     delta_table_path = delta_path / "parcel_data"
@@ -68,17 +67,20 @@ def get_random_time_window(conn: duckdb.DuckDBPyConnection,
 
     if not start_date or not end_date:
         raise ValueError(
-            f"Could not select a {window_days}-day window from available data")
+            f"Could not select a {window_days}-day window from available data"
+        )
 
     return str(start_date), str(end_date)
 
 
 @monitor_performance()
-def get_random_parcels_in_window(conn: duckdb.DuckDBPyConnection,
-                                 delta_dir: str,
-                                 start_date: str,
-                                 end_date: str,
-                                 num_parcels: int = 10) -> pd.DataFrame:
+def get_random_parcels_in_window(
+    conn: duckdb.DuckDBPyConnection,
+    delta_dir: str,
+    start_date: str,
+    end_date: str,
+    num_parcels: int = 10,
+) -> pd.DataFrame:
     """Get random parcels within the specified time window."""
     delta_path = Path(delta_dir).absolute()
     delta_table_path = delta_path / "parcel_data"
@@ -115,7 +117,8 @@ def get_random_parcels_in_window(conn: duckdb.DuckDBPyConnection,
 
     if df.empty:
         raise ValueError(
-            f"No data found for the time window {start_date} to {end_date}")
+            f"No data found for the time window {start_date} to {end_date}"
+        )
 
     return df
 
@@ -124,22 +127,23 @@ def get_sample_statistics(df: pd.DataFrame) -> dict:
     """Calculate statistics for the sample data."""
     return {
         "total_observations": len(df),
-        "unique_parcels": df['parcel_id'].nunique(),
-        "unique_dates": df['date'].nunique(),
-        "unique_partitions": df['parcel_chunk'].nunique(),
-        "avg_ndvi": df['ndvi'].mean(),
-        "avg_evi": df['evi'].mean(),
-        "avg_temperature": df['temperature'].mean(),
-        "avg_precipitation": df['precipitation'].mean(),
-        "avg_cloud_cover": df['cloud_cover'].mean(),
-        "ndvi_range": (df['ndvi'].min(), df['ndvi'].max()),
-        "temp_range": (df['temperature'].min(), df['temperature'].max()),
-        "total_precipitation": df['precipitation'].sum()
+        "unique_parcels": df["parcel_id"].nunique(),
+        "unique_dates": df["date"].nunique(),
+        "unique_partitions": df["parcel_chunk"].nunique(),
+        "avg_ndvi": df["ndvi"].mean(),
+        "avg_evi": df["evi"].mean(),
+        "avg_temperature": df["temperature"].mean(),
+        "avg_precipitation": df["precipitation"].mean(),
+        "avg_cloud_cover": df["cloud_cover"].mean(),
+        "ndvi_range": (df["ndvi"].min(), df["ndvi"].max()),
+        "temp_range": (df["temperature"].min(), df["temperature"].max()),
+        "total_precipitation": df["precipitation"].sum(),
     }
 
 
-def display_sample_info(start_date: str, end_date: str, num_parcels: int,
-                        window_days: int, console: Console):
+def display_sample_info(
+    start_date: str, end_date: str, num_parcels: int, window_days: int, console: Console
+):
     """Display sample selection information."""
     info_text = Text()
     info_text.append("Time Window: ", style="bold cyan")
@@ -154,8 +158,9 @@ def display_sample_info(start_date: str, end_date: str, num_parcels: int,
 
 def display_sample_statistics(stats: dict, console: Console):
     """Display sample statistics in a formatted table."""
-    table = Table(title="Sample Statistics", show_header=True,
-                  header_style="bold magenta")
+    table = Table(
+        title="Sample Statistics", show_header=True, header_style="bold magenta"
+    )
     table.add_column("Metric", style="cyan", width=25)
     table.add_column("Value", style="green", width=20)
 
@@ -168,10 +173,13 @@ def display_sample_statistics(stats: dict, console: Console):
     table.add_row("Average Temperature", f"{stats['avg_temperature']:.1f}°C")
     table.add_row("Average Precipitation", f"{stats['avg_precipitation']:.1f}mm")
     table.add_row("Average Cloud Cover", f"{stats['avg_cloud_cover']:.1f}%")
-    table.add_row("NDVI Range",
-                  f"{stats['ndvi_range'][0]:.3f} - {stats['ndvi_range'][1]:.3f}")
-    table.add_row("Temperature Range",
-                  f"{stats['temp_range'][0]:.1f}°C - {stats['temp_range'][1]:.1f}°C")
+    table.add_row(
+        "NDVI Range", f"{stats['ndvi_range'][0]:.3f} - {stats['ndvi_range'][1]:.3f}"
+    )
+    table.add_row(
+        "Temperature Range",
+        f"{stats['temp_range'][0]:.1f}°C - {stats['temp_range'][1]:.1f}°C",
+    )
     table.add_row("Total Precipitation", f"{stats['total_precipitation']:.1f}mm")
 
     console.print(table)
@@ -195,41 +203,56 @@ def display_sample_data(df: pd.DataFrame, console: Console):
 
     for _, row in display_df.iterrows():
         table.add_row(
-            row['parcel_id'],
-            str(row['date'].date()) if pd.notna(row['date']) else "N/A",
-            row['parcel_chunk'],
+            row["parcel_id"],
+            str(row["date"].date()) if pd.notna(row["date"]) else "N/A",
+            row["parcel_chunk"],
             f"{row['ndvi']:.3f}",
             f"{row['evi']:.3f}",
             f"{row['temperature']:.1f}",
             f"{row['precipitation']:.1f}",
             f"{row['cloud_cover']:.1f}",
-            f"{row['geometry_area']:.1f}"
+            f"{row['geometry_area']:.1f}",
         )
 
     if len(df) > 50:
         console.print(
-            f"\n[dim]Note: Showing first 50 rows of {len(df)} total observations[/dim]")
+            f"\n[dim]Note: Showing first 50 rows of {len(df)} total observations[/dim]"
+        )
 
     console.print(table)
 
 
 def display_parcel_summary(df: pd.DataFrame, console: Console):
     """Display per-parcel summary statistics."""
-    parcel_stats = df.groupby('parcel_id').agg({
-        'date': 'count',
-        'ndvi': ['mean', 'min', 'max'],
-        'evi': 'mean',
-        'temperature': 'mean',
-        'precipitation': 'sum'
-    }).round(3)
+    parcel_stats = (
+        df.groupby("parcel_id")
+        .agg(
+            {
+                "date": "count",
+                "ndvi": ["mean", "min", "max"],
+                "evi": "mean",
+                "temperature": "mean",
+                "precipitation": "sum",
+            }
+        )
+        .round(3)
+    )
 
     # Flatten column names
-    parcel_stats.columns = ['observations', 'ndvi_mean', 'ndvi_min', 'ndvi_max',
-                            'evi_mean', 'temp_mean', 'precip_total']
+    parcel_stats.columns = [
+        "observations",
+        "ndvi_mean",
+        "ndvi_min",
+        "ndvi_max",
+        "evi_mean",
+        "temp_mean",
+        "precip_total",
+    ]
     parcel_stats = parcel_stats.reset_index()
 
-    table = Table(title="Per-Parcel Summary", show_header=True,
-                  header_style="bold cyan")
+    table = Table(
+        title="Per-Parcel Summary", show_header=True, header_style="bold cyan"
+    )
     table.add_column("Parcel ID", style="yellow", width=15)
     table.add_column("Obs", style="white", width=5)
     table.add_column("NDVI Mean", style="green", width=10)
@@ -241,13 +264,13 @@ def display_parcel_summary(df: pd.DataFrame, console: Console):
     for _, row in parcel_stats.iterrows():
         ndvi_range = f"{row['ndvi_min']:.3f}-{row['ndvi_max']:.3f}"
         table.add_row(
-            row['parcel_id'],
-            str(int(row['observations'])),
+            row["parcel_id"],
+            str(int(row["observations"])),
             f"{row['ndvi_mean']:.3f}",
             ndvi_range,
             f"{row['evi_mean']:.3f}",
             f"{row['temp_mean']:.1f}",
-            f"{row['precip_total']:.1f}"
+            f"{row['precip_total']:.1f}",
         )
 
     console.print(table)
@@ -255,21 +278,21 @@ def display_parcel_summary(df: pd.DataFrame, console: Console):
 
 def query_sample(
     delta_dir: str = typer.Option(
-        "output/timeseries-delta", "--delta-dir",
-        help="Path to Delta Lake data directory"
+        "output/timeseries-delta",
+        "--delta-dir",
+        help="Path to Delta Lake data directory",
     ),
     num_parcels: int = typer.Option(
-        10, "--num-parcels",
-        help="Number of random parcels to query"
+        10, "--num-parcels", help="Number of random parcels to query"
     ),
     window_days: int = typer.Option(
-        10, "--window-days",
-        help="Number of consecutive days for the time window"
+        10, "--window-days", help="Number of consecutive days for the time window"
     ),
     show_data: bool = typer.Option(
-        True, "--show-data/--no-data",
-        help="Show the actual sample data (disable for large samples)"
-    )
+        True,
+        "--show-data/--no-data",
+        help="Show the actual sample data (disable for large samples)",
+    ),
 ) -> None:
     """Query random parcels within a random time window from Delta Lake data.
 
@@ -296,7 +319,7 @@ def query_sample(
     try:
         # Connect to Delta Lake
         console.print(f"Connecting to Delta Lake at: {delta_dir}")
-        conn = connect_to_deltalake(delta_dir)
+        conn = connect_to_deltalake()
 
         # Get random time window
         console.print(f"Selecting random {window_days}-day time window...")
@@ -308,8 +331,9 @@ def query_sample(
 
         # Query random parcels in the window
         console.print(f"\nQuerying {num_parcels} random parcels in time window...")
-        df = get_random_parcels_in_window(conn, delta_dir, start_date, end_date,
-                                          num_parcels)
+        df = get_random_parcels_in_window(
+            conn, delta_dir, start_date, end_date, num_parcels
+        )
 
         # Calculate and display statistics
         console.print("\n" + "=" * 60)
@@ -332,7 +356,7 @@ def query_sample(
 
     except Exception as e:
         console.print(f"Error during sample query: {e}", style="bold red")
-        raise typer.Exit(1)
+        raise typer.Exit(1) from e
 
 
 if __name__ == "__main__":

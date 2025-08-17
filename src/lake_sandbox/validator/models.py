@@ -4,6 +4,7 @@ from dataclasses import dataclass
 @dataclass
 class FileDetail:
     """Details about a single parquet file in raw timeseries validation."""
+
     file_path: str
     utm_tile: str
     year: str
@@ -18,6 +19,7 @@ class FileDetail:
 @dataclass
 class ParcelDistribution:
     """Statistics about parcel distribution across files."""
+
     min_parcels_per_file: int
     max_parcels_per_file: int
     avg_parcels_per_file: int
@@ -27,6 +29,7 @@ class ParcelDistribution:
 @dataclass
 class RawValidationResult:
     """Result of raw timeseries validation."""
+
     valid: bool
     total_files: int
     file_details: list[FileDetail]
@@ -40,6 +43,7 @@ class RawValidationResult:
 @dataclass
 class ChunkDetail:
     """Details about a single parcel chunk in organized validation."""
+
     chunk_name: str
     total_records: int
     unique_parcels: int
@@ -52,6 +56,7 @@ class ChunkDetail:
 @dataclass
 class OrganizedValidationResult:
     """Result of organized chunks validation."""
+
     valid: bool
     total_chunks: int
     chunk_details: list[ChunkDetail]
@@ -64,6 +69,7 @@ class OrganizedValidationResult:
 @dataclass
 class TableDetail:
     """Details about a single Delta table in delta validation."""
+
     table_name: str
     version: int
     file_count: int
@@ -78,6 +84,7 @@ class TableDetail:
 @dataclass
 class DeltaValidationResult:
     """Result of Delta tables validation."""
+
     valid: bool
     total_tables: int
     table_details: list[TableDetail]
@@ -90,6 +97,7 @@ class DeltaValidationResult:
 @dataclass
 class ChunkFile:
     """Information about a reorganized chunk file."""
+
     chunk_id: str
     file_path: str
     row_count: int
@@ -98,6 +106,7 @@ class ChunkFile:
 @dataclass
 class ReorganizationProgress:
     """Progress tracking for reorganization phase."""
+
     existing_chunks: int
     chunk_files: list[ChunkFile]
 
@@ -105,6 +114,7 @@ class ReorganizationProgress:
 @dataclass
 class DeltaTableInfo:
     """Information about a Delta table."""
+
     chunk_id: str
     path: str
     version: int
@@ -114,6 +124,7 @@ class DeltaTableInfo:
 @dataclass
 class DeltaConversionProgress:
     """Progress tracking for Delta conversion phase."""
+
     total_chunks: int
     existing_delta_tables: int
     delta_tables: list[DeltaTableInfo]

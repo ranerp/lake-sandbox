@@ -14,8 +14,8 @@ from lake_sandbox.utils.performance import monitor_performance
     columns={
         "results__organized__error": {"data_type": "text"},
         "results__delta__error": {"data_type": "text"},
-        "expectations__dates": {"data_type": "bigint"}
-    }
+        "expectations__dates": {"data_type": "bigint"},
+    },
 )
 @monitor_performance()
 def validation_resource(
@@ -26,7 +26,7 @@ def validation_resource(
     expected_total_parcels: int = 500_000,
     expected_chunk_size: int = 10_000,
     expected_tiles: int = 2,
-    expected_dates: int | None = None
+    expected_dates: int | None = None,
 ) -> Iterator[dict[str, Any]]:
     """DLT resource for validating processed data.
 
@@ -60,7 +60,7 @@ def validation_resource(
             raw_result = validate_raw_timeseries(
                 raw_dir=raw_dir,
                 expected_total_parcels=expected_total_parcels,
-                verbose=False
+                verbose=False,
             )
             validation_results["raw"] = {
                 "valid": raw_result.valid,
@@ -68,7 +68,7 @@ def validation_resource(
                 "total_unique_parcels": raw_result.total_unique_parcels,
                 "total_records": raw_result.total_records,
                 "issues": raw_result.issues,
-                "error": getattr(raw_result, 'error', None)
+                "error": getattr(raw_result, "error", None),
             }
 
         elif target in ["organized", "both"]:
@@ -78,7 +78,7 @@ def validation_resource(
                 expected_tiles=expected_tiles,
                 expected_dates=expected_dates,
                 raw_dir=raw_dir,
-                verbose=False
+                verbose=False,
             )
             validation_results["organized"] = {
                 "valid": organized_result.valid,
@@ -86,14 +86,12 @@ def validation_resource(
                 "total_unique_parcels": organized_result.total_unique_parcels,
                 "total_records": organized_result.total_records,
                 "issues": organized_result.issues,
-                "error": getattr(organized_result, 'error', None)
+                "error": getattr(organized_result, "error", None),
             }
 
         if target in ["delta", "both"]:
             delta_result = validate_delta_tables(
-                delta_dir=delta_dir,
-                verbose=False,
-                organized_dir=organized_dir
+                delta_dir=delta_dir, verbose=False, organized_dir=organized_dir
             )
             validation_results["delta"] = {
                 "valid": delta_result.valid,
@@ -101,13 +99,14 @@ def validation_resource(
                 "total_unique_parcels": delta_result.total_unique_parcels,
                 "total_records": delta_result.total_records,
                 "issues": delta_result.issues,
-                "error": getattr(delta_result, 'error', None)
+                "error": getattr(delta_result, "error", None),
             }
 
         # Determine overall validation status
         all_valid = all(result["valid"] for result in validation_results.values())
         total_issues = sum(
-            len(result["issues"]) for result in validation_results.values())
+            len(result["issues"]) for result in validation_results.values()
+        )
 
         yield {
             "stage": "validation",
@@ -119,14 +118,14 @@ def validation_resource(
             "directories": {
                 "raw_dir": raw_dir,
                 "organized_dir": organized_dir,
-                "delta_dir": delta_dir
+                "delta_dir": delta_dir,
             },
             "expectations": {
                 "total_parcels": expected_total_parcels,
                 "chunk_size": expected_chunk_size,
                 "tiles": expected_tiles,
-                "dates": expected_dates
-            }
+                "dates": expected_dates,
+            },
         }
 
     except Exception as e:
@@ -138,14 +137,13 @@ def validation_resource(
             "directories": {
                 "raw_dir": raw_dir,
                 "organized_dir": organized_dir,
-                "delta_dir": delta_dir
-            }
+                "delta_dir": delta_dir,
+            },
         }
 
 
 def create_validation_pipeline(
-    pipeline_name: str = "validation_pipeline",
-    destination: str = "duckdb"
+    pipeline_name: str = "validation_pipeline", destination: str = "duckdb"
 ) -> dlt.Pipeline:
     """Create a DLT pipeline for data validation.
 
@@ -160,5 +158,5 @@ def create_validation_pipeline(
     return dlt.pipeline(
         pipeline_name=pipeline_name,
         destination=destination,
-        dataset_name="lake_sandbox_validation"
+        dataset_name="lake_sandbox_validation",
     )

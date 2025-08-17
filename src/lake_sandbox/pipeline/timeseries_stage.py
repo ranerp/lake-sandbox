@@ -42,7 +42,7 @@ def generate_timeseries_resource(
             utm_tiles=utm_tiles,
             start_date=start_date,
             end_date=end_date,
-            num_parcels=num_parcels
+            num_parcels=num_parcels,
         )
 
         # Verify output exists
@@ -55,7 +55,8 @@ def generate_timeseries_resource(
 
         # Count tiles from comma-separated string
         tiles_count = len(
-            [tile.strip() for tile in utm_tiles.split(",") if tile.strip()])
+            [tile.strip() for tile in utm_tiles.split(",") if tile.strip()]
+        )
 
         yield {
             "stage": "timeseries_generation",
@@ -65,7 +66,7 @@ def generate_timeseries_resource(
             "num_parcels": num_parcels,
             "date_range": f"{start_date} to {end_date}",
             "utm_tiles": utm_tiles,
-            "tiles_count": tiles_count
+            "tiles_count": tiles_count,
         }
 
     except Exception as e:
@@ -73,13 +74,12 @@ def generate_timeseries_resource(
             "stage": "timeseries_generation",
             "status": "failed",
             "error": str(e),
-            "output_dir": output_dir
+            "output_dir": output_dir,
         }
 
 
 def create_timeseries_pipeline(
-    pipeline_name: str = "timeseries_pipeline",
-    destination: str = "duckdb"
+    pipeline_name: str = "timeseries_pipeline", destination: str = "duckdb"
 ) -> dlt.Pipeline:
     """Create a DLT pipeline for timeseries generation.
 
@@ -94,5 +94,5 @@ def create_timeseries_pipeline(
     return dlt.pipeline(
         pipeline_name=pipeline_name,
         destination=destination,
-        dataset_name="lake_sandbox_timeseries"
+        dataset_name="lake_sandbox_timeseries",
     )

@@ -46,7 +46,7 @@ class TestParseDateRange:
         assert len(result) == 9
         # Verify weekly intervals
         for i in range(1, len(result)):
-            days_diff = (result[i] - result[i-1]).days
+            days_diff = (result[i] - result[i - 1]).days
             assert days_diff == 7
 
     def test_parse_date_range_custom_interval(self):

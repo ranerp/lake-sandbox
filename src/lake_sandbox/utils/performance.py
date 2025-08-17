@@ -142,9 +142,9 @@ def get_system_info() -> dict[str, Any]:
     return {
         "cpu_count": psutil.cpu_count(),
         "cpu_count_logical": psutil.cpu_count(logical=True),
-        "memory_total_gb": psutil.virtual_memory().total / 1024 ** 3,
-        "memory_available_gb": psutil.virtual_memory().available / 1024 ** 3,
-        "disk_usage_gb": psutil.disk_usage("/").total / 1024 ** 3,
+        "memory_total_gb": psutil.virtual_memory().total / 1024**3,
+        "memory_available_gb": psutil.virtual_memory().available / 1024**3,
+        "disk_usage_gb": psutil.disk_usage("/").total / 1024**3,
     }
 
 
@@ -155,8 +155,10 @@ def print_system_info() -> None:
     typer.echo("SYSTEM INFORMATION")
     typer.echo("=" * 60)
     typer.echo(
-        f"CPU Cores: {info['cpu_count']} physical, {info['cpu_count_logical']} logical")
+        f"CPU Cores: {info['cpu_count']} physical, {info['cpu_count_logical']} logical"
+    )
     typer.echo(
-        f"Memory: {info['memory_total_gb']:.1f} GB total, {info['memory_available_gb']:.1f} GB available")
+        f"Memory: {info['memory_total_gb']:.1f} GB total, {info['memory_available_gb']:.1f} GB available"
+    )
     typer.echo(f"Disk: {info['disk_usage_gb']:.1f} GB total")
     typer.echo("=" * 60 + "\n")

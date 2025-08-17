@@ -18,26 +18,27 @@ def reorg(
         "./output/timeseries-raw",
         "--input-dir",
         "-i",
-        help="Input directory with raw parquet files partitioned by utm_tile/year/date"
+        help="Input directory with raw parquet files partitioned by utm_tile/year/date",
     ),
     output_dir: str = typer.Option(
         "./output/timeseries-organized",
         "--output-dir",
         "-o",
-        help="Output directory for reorganized parquet files partitioned by parcel_chunk"
+        help="Output directory for reorganized parquet files partitioned by parcel_chunk",
     ),
     delta_dir: str = typer.Option(
         "./output/timeseries-delta",
         "--delta-dir",
         "-d",
-        help="Output directory for Delta Lake tables"
+        help="Output directory for Delta Lake tables",
     ),
     chunk_size: int = typer.Option(
         10_000, "--chunk-size", help="Number of parcels per chunk"
     ),
     phase: str = typer.Option(
-        "all", "--phase",
-        help="Which phase to run: 'reorg', 'delta', 'optimize', or 'all'"
+        "all",
+        "--phase",
+        help="Which phase to run: 'reorg', 'delta', 'optimize', or 'all'",
     ),
     force: bool = typer.Option(
         False, "--force", help="Force reprocessing of existing files"
@@ -75,34 +76,30 @@ def reorg(
             output_dir=output_dir,
             chunk_size=chunk_size,
             dry_run=dry_run,
-            force=force
+            force=force,
         )
 
         if not dry_run and phase1_stats["failed"] > 0:
             typer.echo(
-                f"⚠ Phase 1 had {phase1_stats['failed']} failures. Consider running with --force to retry.")
+                f"⚠ Phase 1 had {phase1_stats['failed']} failures. Consider running with --force to retry."
+            )
 
     # Phase 2: Delta Lake conversion
     if phase in ["delta", "all"]:
         typer.echo("\n" + "=" * 60)
         phase2_stats = convert_to_delta_lake(
-            input_dir=output_dir,
-            delta_dir=delta_dir,
-            dry_run=dry_run,
-            force=force
+            input_dir=output_dir, delta_dir=delta_dir, dry_run=dry_run, force=force
         )
 
         if not dry_run and phase2_stats["failed"] > 0:
             typer.echo(
-                f"⚠ Phase 2 had {phase2_stats['failed']} failures. Consider running with --force to retry.")
+                f"⚠ Phase 2 had {phase2_stats['failed']} failures. Consider running with --force to retry."
+            )
 
     # Phase 3: Optimization (optional)
     if phase in ["optimize", "all"]:
         typer.echo("\n" + "=" * 60)
-        optimize_stats = optimize_all_delta_tables(
-            delta_dir=delta_dir,
-            dry_run=dry_run
-        )
+        optimize_stats = optimize_all_delta_tables(delta_dir=delta_dir, dry_run=dry_run)
 
         if not dry_run and optimize_stats["failed"] > 0:
             typer.echo(f"⚠ Optimization had {optimize_stats['failed']} failures.")
@@ -121,7 +118,8 @@ def show_reorganization_status(input_dir: str, output_dir: str, delta_dir: str) 
     # Check Phase 1 progress
     reorg_progress = get_reorganization_progress(output_dir)
     typer.echo(
-        f"Phase 1 (Reorganization): {reorg_progress.existing_chunks} chunks completed")
+        f"Phase 1 (Reorganization): {reorg_progress.existing_chunks} chunks completed"
+    )
 
     if reorg_progress.existing_chunks > 0:
         total_rows = sum(chunk.row_count for chunk in reorg_progress.chunk_files)
@@ -130,24 +128,25 @@ def show_reorganization_status(input_dir: str, output_dir: str, delta_dir: str) 
     # Check Phase 2 progress
     delta_progress = get_delta_conversion_progress(output_dir, delta_dir)
     typer.echo(
-        f"Phase 2 (Delta Conversion): {delta_progress.existing_delta_tables}/{delta_progress.total_chunks} Delta tables completed")
+        f"Phase 2 (Delta Conversion): {delta_progress.existing_delta_tables}/{delta_progress.total_chunks} Delta tables completed"
+    )
 
     if delta_progress.existing_delta_tables > 0:
-        total_files = sum(
-            table.file_count for table in delta_progress.delta_tables)
+        total_files = sum(table.file_count for table in delta_progress.delta_tables)
         typer.echo(f"  Total Delta files: {total_files}")
 
     # Recommendations
     if reorg_progress.existing_chunks == 0:
-        typer.echo(
-            "\nRun: lake-sandbox reorg --phase reorg  (to start reorganization)")
+        typer.echo("\nRun: lake-sandbox reorg --phase reorg  (to start reorganization)")
     elif delta_progress.existing_delta_tables < delta_progress.total_chunks:
         missing = delta_progress.total_chunks - delta_progress.existing_delta_tables
         typer.echo(
-            f"\nRun: lake-sandbox reorg --phase delta  (to convert {missing} remaining chunks)")
+            f"\nRun: lake-sandbox reorg --phase delta  (to convert {missing} remaining chunks)"
+        )
     elif delta_progress.existing_delta_tables > 0:
         typer.echo(
-            "\nRun: lake-sandbox reorg --phase optimize  (to optimize Delta tables)")
+            "\nRun: lake-sandbox reorg --phase optimize  (to optimize Delta tables)"
+        )
         typer.echo("✓ Reorganization appears complete!")
 
     typer.echo("\nData locations:")
