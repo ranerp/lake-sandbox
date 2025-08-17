@@ -8,6 +8,7 @@ A sandbox and example for timeseries data generation, reorganization, and valida
 - **Data Reorganization**: Convert date-partitioned data to parcel-chunk-partitioned format with hash-based distribution
 - **Delta Lake Integration**: Convert reorganized data to a single partitioned Delta Lake table for ACID transactions and time travel
 - **Data Validation**: Comprehensive validation of raw, organized, and Delta Lake data with completeness checks
+- **Data Analysis**: Query individual parcels, sample random data, and analyze partitioning performance
 - **Pipeline Orchestration**: End-to-end pipeline using DLT for execution tracking and monitoring
 - **Performance Monitoring**: Built-in performance monitoring with memory usage and execution time tracking
 
@@ -327,6 +328,76 @@ uv run lake-sandbox validate --help
 # List all available commands
 uv run lake-sandbox --help
 ```
+
+## Data Analysis and Querying
+
+### Query Individual Parcels
+
+Query and display specific parcel timeseries data:
+
+```bash
+# Query specific parcel
+uv run lake-sandbox query-parcel --parcel-id parcel_00001
+
+# Query random parcel
+uv run lake-sandbox query-parcel --random
+
+# Export to CSV
+uv run lake-sandbox query-parcel --parcel-id parcel_00001 --export results.csv
+
+# Show detailed summary
+uv run lake-sandbox query-parcel --parcel-id parcel_00001 --show-summary
+```
+
+### Sample Random Data
+
+Sample random parcels within random time windows (useful for ML training):
+
+```bash
+# Sample 10 parcels in 7-day window
+uv run lake-sandbox query-sample --num-parcels 10 --window-days 7
+
+# Sample with different parameters
+uv run lake-sandbox query-sample --num-parcels 20 --window-days 14 --seed 42
+
+# Use custom delta directory
+uv run lake-sandbox query-sample --delta-dir ./custom/delta --num-parcels 5
+```
+
+### Analyze Partitioning Performance
+
+Analyze Delta Lake partitioning efficiency and query performance:
+
+```bash
+# Basic partitioning analysis
+uv run lake-sandbox analyze-partitioning
+
+# Test more parcels for better statistics
+uv run lake-sandbox analyze-partitioning --num-test-parcels 20
+
+# Use custom delta directory
+uv run lake-sandbox analyze-partitioning --delta-dir ./custom/delta
+```
+
+This analysis provides:
+- Partition distribution statistics
+- Query performance benchmarks for parcel_id lookups
+- Partition pruning effectiveness
+- Optimization recommendations for different workloads
+
+### Full Data Analysis
+
+For comprehensive data analysis with visualizations:
+
+```bash
+# Basic analysis with plots
+uv run lake-sandbox analyze
+
+# Custom analysis parameters
+uv run lake-sandbox analyze --sample-parcels 20 --output-dir ./plots --show-plots
+```
+
+See [examples/README.md](src/lake_sandbox/examples/README.md) for detailed analysis documentation.
 
 ## Examples
 

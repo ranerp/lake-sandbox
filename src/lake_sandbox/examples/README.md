@@ -10,8 +10,11 @@ These examples show how to:
 
 - Connect to DeltaLake tables using DuckDB
 - Query and analyze vegetation timeseries data
+- Query individual parcel timeseries
+- Sample random parcels within time windows
 - Create various visualizations and charts
 - Perform statistical analysis and data quality assessment
+- Analyze partitioning performance
 
 ## Files
 
@@ -38,6 +41,33 @@ An interactive Jupyter notebook with the same analysis as the Python script, plu
 - Advanced DuckDB queries
 - Summary findings
 
+### 📄 `query_parcel.py`
+
+Query and display individual parcel timeseries data:
+
+- Query specific parcel IDs or select random parcels
+- Display formatted timeseries data in console
+- Show parcel summary statistics
+- Export data to CSV format
+
+### 📄 `query_sample.py`
+
+Sample random parcels within random time windows:
+
+- Select random parcels from the dataset
+- Choose random time windows of specified duration
+- Display sample data in formatted console tables
+- Useful for data exploration and ML training preparation
+
+### 📄 `analyze_partitioning.py`
+
+Analyze Delta Lake partitioning performance:
+
+- Test query performance for different access patterns
+- Analyze partition distribution and balance
+- Compare single-partition vs cross-partition queries
+- Provide optimization recommendations
+
 ## Prerequisites
 
 Make sure you have these dependencies installed:
@@ -59,6 +89,16 @@ uv run lake-sandbox analyze --delta-dir output/timeseries-delta --output-dir plo
 
 # Show plots interactively (requires display)
 uv run lake-sandbox analyze --show-plots
+
+# Query individual parcel timeseries
+uv run lake-sandbox query-parcel --parcel-id parcel_00001
+uv run lake-sandbox query-parcel --random  # Select random parcel
+
+# Sample random parcels in random time windows
+uv run lake-sandbox query-sample --num-parcels 10 --window-days 7
+
+# Analyze partitioning performance
+uv run lake-sandbox analyze-partitioning --num-test-parcels 10
 ```
 
 ### Option 2: Run the Python Script Directly
@@ -79,7 +119,7 @@ This will:
     - `monthly_trends.png`
 3. Print statistical summaries to the console
 
-### Option 2: Use the Jupyter Notebook
+### Option 3: Use the Jupyter Notebook
 
 ```bash
 cd examples/
@@ -93,6 +133,20 @@ This provides an interactive environment where you can:
 - Explore the data step by step
 - Add your own analysis
 
+### Option 4: Run Individual Scripts
+
+```bash
+# Query specific parcel data
+cd src/lake_sandbox/examples/
+python query_parcel.py --parcel-id parcel_00001
+
+# Sample random data
+python query_sample.py --num-parcels 5 --window-days 14
+
+# Analyze partitioning
+python analyze_partitioning.py --num-test-parcels 8
+```
+
 ## Example Queries
 
 ### Basic Data Loading
@@ -104,9 +158,8 @@ SELECT
     utm_tile,
     ndvi,
     evi,
-    savi,
     cloud_cover
-FROM delta_scan('./output/timeseries-delta/parcel_chunk=*')
+FROM delta_scan('./output/timeseries-delta/parcel_data')
 ORDER BY parcel_id, date
 ```
 
@@ -119,7 +172,7 @@ SELECT
     COUNT(*) as observations,
     AVG(ndvi) as avg_ndvi,
     AVG(cloud_cover) as avg_cloud_cover
-FROM delta_scan('./output/timeseries-delta/parcel_chunk=*')
+FROM delta_scan('./output/timeseries-delta/parcel_data')
 GROUP BY EXTRACT(MONTH FROM date), utm_tile
 ORDER BY month, utm_tile
 ```
@@ -133,7 +186,7 @@ WITH parcel_stats AS (
         MIN(ndvi) as min_ndvi,
         MAX(ndvi) as max_ndvi,
         MAX(ndvi) - MIN(ndvi) as ndvi_growth
-    FROM delta_scan('./output/timeseries-delta/parcel_chunk=*')
+    FROM delta_scan('./output/timeseries-delta/parcel_data')
     GROUP BY parcel_id
 )
 SELECT *
@@ -155,7 +208,7 @@ LIMIT 10
 ### Visualizations
 
 1. **NDVI Timeseries**: Shows vegetation growth patterns over time for sample parcels
-2. **Distribution Plots**: Histograms of NDVI, EVI, SAVI, and cloud cover values
+2. **Distribution Plots**: Histograms of NDVI, EVI, and cloud cover values
 3. **Correlation Heatmap**: Relationships between vegetation indices and environmental factors
 4. **UTM Tile Comparison**: Box plots comparing vegetation indices between tiles
 5. **Monthly Trends**: Seasonal patterns in vegetation indices
@@ -165,10 +218,11 @@ LIMIT 10
 The analysis typically reveals:
 
 - **Seasonal Growth**: Vegetation indices increase from winter (January) to spring (April)
-- **Strong Correlations**: NDVI, EVI, and SAVI are highly correlated (r > 0.9)
+- **Strong Correlations**: NDVI and EVI are highly correlated (r > 0.9)
 - **Cloud Impact**: Higher cloud cover generally correlates with lower observation quality
 - **Spatial Variation**: Different UTM tiles may show varying vegetation characteristics
 - **Data Quality**: Most parcels have consistent observations across all dates
+- **Partitioning Performance**: Hash-based partitioning provides balanced distribution optimal for ML training workloads
 
 ## Customization
 
@@ -184,7 +238,7 @@ You can easily modify the examples to:
 ```python
 # Filter to specific UTM tile
 query = f"""
-SELECT * FROM delta_scan('{delta_path}/parcel_chunk=*')
+SELECT * FROM delta_scan('{delta_path}/parcel_data')
 WHERE utm_tile = '32TNR'
 """
 

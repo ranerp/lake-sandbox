@@ -83,16 +83,16 @@ def convert_to_delta_lake(
     # Check if Delta table already exists
     table_exists = False
     existing_partitions = set()
-    
+
     if delta_table_path.exists() and not force:
         is_valid, dt, error = validate_delta_table(delta_table_path)
-        
+
         if is_valid:
             version = dt.version()
             file_count = len(dt.files())
             typer.echo(f"✓ Delta table exists (version {version}, {file_count} files)")
             table_exists = True
-            
+
             existing_partitions = get_delta_partitions(dt)
             typer.echo(f"Found {len(existing_partitions)} existing partitions")
         else:
@@ -100,7 +100,7 @@ def convert_to_delta_lake(
 
     # Process each chunk and stream to Delta table
     first_chunk = True
-    
+
     for chunk_dir in sorted(chunk_dirs):
         chunk_name = chunk_dir.name
         typer.echo(f"Processing {chunk_name}")
