@@ -1,7 +1,6 @@
 """Cross-validation utilities for Delta tables and organized data."""
 
 from pathlib import Path
-from typing import Set
 
 import duckdb
 import typer
@@ -10,19 +9,19 @@ from lake_sandbox.reorg_pattern.reorganize.validation import validate_parquet_fi
 
 
 def cross_validate_organized_chunk(delta_table_path: Path,
-                                 partition: str,
-                                 organized_chunk_file: Path,
-                                 conn: duckdb.DuckDBPyConnection,
-                                 verbose: bool = False) -> tuple[bool, str | None]:
+                                   partition: str,
+                                   organized_chunk_file: Path,
+                                   conn: duckdb.DuckDBPyConnection,
+                                   verbose: bool = False) -> tuple[bool, str | None]:
     """Cross-validate Delta partition against organized chunk.
-    
+
     Args:
         delta_table_path: Path to the Delta table
         partition: Partition identifier
         organized_chunk_file: Path to the organized chunk file
         conn: DuckDB connection
         verbose: Whether to show detailed output
-        
+
     Returns:
         Tuple of (is_valid, error_message)
     """
@@ -30,7 +29,7 @@ def cross_validate_organized_chunk(delta_table_path: Path,
     is_valid, org_raw_count, error = validate_parquet_file(organized_chunk_file, conn)
     if not is_valid:
         return False, f"Organized chunk validation failed: {error}"
-    
+
     try:
         # Get organized chunk deduplicated count
         org_dedup_count = conn.execute(f"""
@@ -48,32 +47,35 @@ def cross_validate_organized_chunk(delta_table_path: Path,
 
         if org_dedup_count != delta_count:
             return False, f"Record count mismatch - organized (deduplicated): {org_dedup_count:,}, delta: {delta_count:,}"
-        
+
         if verbose:
-            dedup_pct = (org_dedup_count / org_raw_count * 100) if org_raw_count > 0 else 0
-            typer.echo(f"  ✓ Partition {partition}: Record counts match ({org_dedup_count:,} records)")
-            typer.echo(f"    📊 Deduplication: {org_raw_count:,} → {org_dedup_count:,} ({dedup_pct:.1f}% kept)")
-        
+            dedup_pct = (
+                    org_dedup_count / org_raw_count * 100) if org_raw_count > 0 else 0
+            typer.echo(
+                f"  ✓ Partition {partition}: Record counts match ({org_dedup_count:,} records)")
+            typer.echo(
+                f"    📊 Deduplication: {org_raw_count:,} → {org_dedup_count:,} ({dedup_pct:.1f}% kept)")
+
         return True, None
-        
+
     except Exception as e:
         return False, f"Cross-validation query failed: {e}"
 
 
 def cross_validate_partitions_with_organized(delta_table_path: Path,
-                                           partitions: Set[str],
-                                           organized_dir: str,
-                                           conn: duckdb.DuckDBPyConnection,
-                                           verbose: bool = False) -> list:
+                                             partitions: set[str],
+                                             organized_dir: str,
+                                             conn: duckdb.DuckDBPyConnection,
+                                             verbose: bool = False) -> list:
     """Cross-validate all Delta partitions with organized chunks.
-    
+
     Args:
         delta_table_path: Path to the Delta table
         partitions: Set of Delta partition IDs
         organized_dir: Directory containing organized chunks
         conn: DuckDB connection
         verbose: Whether to show detailed output
-        
+
     Returns:
         List of validation issues found
     """
@@ -99,18 +101,18 @@ def cross_validate_partitions_with_organized(delta_table_path: Path,
     # Compare record counts for each partition
     for partition in sorted(partitions):
         chunk_file = organized_path / f"parcel_chunk={partition}" / "data.parquet"
-        
+
         if not chunk_file.exists():
             issue = f"Partition {partition}: Corresponding organized chunk not found"
             issues.append(issue)
             if verbose:
                 typer.echo(f"  ⚠ {issue}")
             continue
-        
+
         is_valid, error = cross_validate_organized_chunk(
             delta_table_path, partition, chunk_file, conn, verbose
         )
-        
+
         if not is_valid:
             issues.append(f"Partition {partition}: {error}")
             if verbose:

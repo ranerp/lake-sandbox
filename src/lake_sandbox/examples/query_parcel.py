@@ -1,19 +1,19 @@
 """Example: Query and display a single parcel timeseries from Delta Lake data."""
 
 from pathlib import Path
-from typing import Optional
 
 import duckdb
 import pandas as pd
 import typer
 from rich.console import Console
-from rich.table import Table
 from rich.panel import Panel
+from rich.table import Table
 
 from lake_sandbox.utils.performance import monitor_performance
 
 
-def connect_to_deltalake(delta_dir: str = "./output/timeseries-delta") -> duckdb.DuckDBPyConnection:
+def connect_to_deltalake(
+    delta_dir: str = "./output/timeseries-delta") -> duckdb.DuckDBPyConnection:
     """Connect to DeltaLake data using DuckDB."""
     conn = duckdb.connect()
 
@@ -66,8 +66,8 @@ def get_dataset_summary(conn: duckdb.DuckDBPyConnection, delta_dir: str) -> dict
 
 @monitor_performance()
 def get_random_parcel_timeseries(conn: duckdb.DuckDBPyConnection,
-                                delta_dir: str,
-                                parcel_id: Optional[str] = None) -> pd.DataFrame:
+                                 delta_dir: str,
+                                 parcel_id: str | None = None) -> pd.DataFrame:
     """Get timeseries data for a specific or random parcel."""
     delta_path = Path(delta_dir).absolute()
     delta_table_path = delta_path / "parcel_data"
@@ -127,7 +127,8 @@ def get_random_parcel_timeseries(conn: duckdb.DuckDBPyConnection,
 
 def display_dataset_summary(summary: dict, console: Console):
     """Display dataset summary in a formatted table."""
-    table = Table(title="Dataset Summary", show_header=True, header_style="bold magenta")
+    table = Table(title="Dataset Summary", show_header=True,
+                  header_style="bold magenta")
     table.add_column("Metric", style="cyan", width=20)
     table.add_column("Value", style="green", width=20)
 
@@ -154,7 +155,8 @@ def display_parcel_timeseries(df: pd.DataFrame, console: Console):
     console.print(Panel(info_text, title="Parcel Information", style="blue"))
 
     # Timeseries table
-    table = Table(title=f"Timeseries Data for Parcel {parcel_id}", show_header=True, header_style="bold green")
+    table = Table(title=f"Timeseries Data for Parcel {parcel_id}", show_header=True,
+                  header_style="bold green")
     table.add_column("Date", style="cyan", width=12)
     table.add_column("NDVI", style="green", width=8)
     table.add_column("EVI", style="blue", width=8)
@@ -177,15 +179,18 @@ def display_parcel_timeseries(df: pd.DataFrame, console: Console):
     console.print(table)
 
     # Summary statistics for this parcel
-    stats_table = Table(title="Parcel Statistics", show_header=True, header_style="bold yellow")
+    stats_table = Table(title="Parcel Statistics", show_header=True,
+                        header_style="bold yellow")
     stats_table.add_column("Metric", style="cyan")
     stats_table.add_column("Value", style="green")
 
-    stats_table.add_row("NDVI Range", f"{df['ndvi'].min():.3f} - {df['ndvi'].max():.3f}")
+    stats_table.add_row("NDVI Range",
+                        f"{df['ndvi'].min():.3f} - {df['ndvi'].max():.3f}")
     stats_table.add_row("NDVI Mean", f"{df['ndvi'].mean():.3f}")
     stats_table.add_row("EVI Range", f"{df['evi'].min():.3f} - {df['evi'].max():.3f}")
     stats_table.add_row("EVI Mean", f"{df['evi'].mean():.3f}")
-    stats_table.add_row("Temp Range", f"{df['temperature'].min():.1f}°C - {df['temperature'].max():.1f}°C")
+    stats_table.add_row("Temp Range",
+                        f"{df['temperature'].min():.1f}°C - {df['temperature'].max():.1f}°C")
     stats_table.add_row("Total Precipitation", f"{df['precipitation'].sum():.1f}mm")
     stats_table.add_row("Avg Cloud Cover", f"{df['cloud_cover'].mean():.1f}%")
 
@@ -197,7 +202,7 @@ def query_parcel(
         "output/timeseries-delta", "--delta-dir",
         help="Path to Delta Lake data directory"
     ),
-    parcel_id: Optional[str] = typer.Option(
+    parcel_id: str | None = typer.Option(
         None, "--parcel-id",
         help="Specific parcel ID to query (if not provided, random parcel will be selected)"
     ),
@@ -235,12 +240,12 @@ def query_parcel(
 
         # Show dataset summary if requested
         if show_summary:
-            console.print("\n" + "="*50)
+            console.print("\n" + "=" * 50)
             summary = get_dataset_summary(conn, delta_dir)
             display_dataset_summary(summary, console)
 
         # Query parcel timeseries
-        console.print("\n" + "="*50)
+        console.print("\n" + "=" * 50)
         if parcel_id:
             console.print(f"Querying specific parcel: {parcel_id}")
         else:

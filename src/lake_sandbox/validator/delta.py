@@ -3,13 +3,15 @@ from pathlib import Path
 import duckdb
 import typer
 
-from lake_sandbox.utils.performance import monitor_performance
-from lake_sandbox.validator.models import DeltaValidationResult, TableDetail
 from lake_sandbox.reorg_pattern.delta.validation import (
-    validate_delta_table,
     get_delta_partitions,
+    validate_delta_table,
 )
-from lake_sandbox.validator.cross_validation import cross_validate_partitions_with_organized
+from lake_sandbox.utils.performance import monitor_performance
+from lake_sandbox.validator.cross_validation import (
+    cross_validate_partitions_with_organized,
+)
+from lake_sandbox.validator.models import DeltaValidationResult, TableDetail
 
 
 @monitor_performance()
@@ -61,7 +63,8 @@ def validate_delta_tables(
         )
 
     typer.echo("Found partitioned Delta table")
-    return validate_partitioned_delta_table(str(partitioned_table_path), verbose, organized_dir)
+    return validate_partitioned_delta_table(str(partitioned_table_path), verbose,
+                                            organized_dir)
 
 
 def validate_partitioned_delta_table(
@@ -134,7 +137,8 @@ def validate_partitioned_delta_table(
         # Check completeness
         expected_combinations = unique_parcels * unique_dates
         missing_combinations = expected_combinations - unique_combinations
-        completeness_pct = (unique_combinations / expected_combinations * 100) if expected_combinations > 0 else 0
+        completeness_pct = (
+                unique_combinations / expected_combinations * 100) if expected_combinations > 0 else 0
 
         # Validate each partition
         table_details: list[TableDetail] = []
@@ -181,7 +185,8 @@ def validate_partitioned_delta_table(
             table_details.append(table_detail)
 
             if verbose:
-                typer.echo(f"  ✓ Partition {partition}: {part_parcels:,} parcels, {part_dates} dates, {part_total:,} records")
+                typer.echo(
+                    f"  ✓ Partition {partition}: {part_parcels:,} parcels, {part_dates} dates, {part_total:,} records")
 
         # Check for parcel overlaps between partitions
         all_partition_parcels: set[str] = set()
@@ -210,7 +215,8 @@ def validate_partitioned_delta_table(
 
         # Summary
         typer.echo("\n=== VALIDATION SUMMARY ===")
-        typer.echo(f"Partitioned Delta table: 1 table with {len(partitions)} partitions")
+        typer.echo(
+            f"Partitioned Delta table: 1 table with {len(partitions)} partitions")
         typer.echo(f"Total unique parcels: {unique_parcels:,}")
         typer.echo(f"Total records: {total_records:,}")
         typer.echo(f"Date range: {min_date} to {max_date}")
@@ -370,16 +376,21 @@ def _validate_partition_vs_chunk(
             issues.append(issue)
             if verbose:
                 typer.echo(f"  ✗ {issue}")
-                typer.echo(f"    📊 Raw organized count: {organized_raw_count:,}, deduplicated: {organized_dedup_count:,}")
+                typer.echo(
+                    f"    📊 Raw organized count: {organized_raw_count:,}, deduplicated: {organized_dedup_count:,}")
         else:
             if verbose:
-                dedup_pct = (organized_dedup_count / organized_raw_count * 100) if organized_raw_count > 0 else 0
-                typer.echo(f"  ✓ Partition {partition}: Record counts match ({organized_dedup_count:,} records)")
-                typer.echo(f"    📊 Deduplication: {organized_raw_count:,} → {organized_dedup_count:,} ({dedup_pct:.1f}% kept)")
+                dedup_pct = (
+                        organized_dedup_count / organized_raw_count * 100) if organized_raw_count > 0 else 0
+                typer.echo(
+                    f"  ✓ Partition {partition}: Record counts match ({organized_dedup_count:,} records)")
+                typer.echo(
+                    f"    📊 Deduplication: {organized_raw_count:,} → {organized_dedup_count:,} ({dedup_pct:.1f}% kept)")
 
             # Perform deeper per-parcel validation
             if verbose:
-                typer.echo(f"    🔍 Validating per-parcel data points for partition {partition}...")
+                typer.echo(
+                    f"    🔍 Validating per-parcel data points for partition {partition}...")
             per_parcel_issues = _validate_per_parcel_data_points(
                 delta_table_path, partition, chunk_file, conn, verbose
             )
@@ -437,8 +448,12 @@ def _validate_per_parcel_data_points(
         """).fetchdf()
 
         # Convert to dictionaries for easier comparison
-        organized_counts = dict(zip(organized_parcel_counts['parcel_id'], organized_parcel_counts['count']))
-        delta_counts = dict(zip(delta_parcel_counts['parcel_id'], delta_parcel_counts['count']))
+        organized_counts = dict(
+            zip(organized_parcel_counts['parcel_id'], organized_parcel_counts['count'],
+                strict=False))
+        delta_counts = dict(
+            zip(delta_parcel_counts['parcel_id'], delta_parcel_counts['count'],
+                strict=False))
 
         # Check for missing parcels in either direction
         organized_parcels = set(organized_counts.keys())
@@ -450,7 +465,8 @@ def _validate_per_parcel_data_points(
             issues.append(issue)
             if verbose:
                 sample_missing = list(missing_in_delta)[:3]
-                typer.echo(f"    ✗ Missing parcels in Delta: {sample_missing}{'...' if len(missing_in_delta) > 3 else ''}")
+                typer.echo(
+                    f"    ✗ Missing parcels in Delta: {sample_missing}{'...' if len(missing_in_delta) > 3 else ''}")
 
         extra_in_delta = delta_parcels - organized_parcels
         if extra_in_delta:
@@ -458,7 +474,8 @@ def _validate_per_parcel_data_points(
             issues.append(issue)
             if verbose:
                 sample_extra = list(extra_in_delta)[:3]
-                typer.echo(f"    ✗ Extra parcels in Delta: {sample_extra}{'...' if len(extra_in_delta) > 3 else ''}")
+                typer.echo(
+                    f"    ✗ Extra parcels in Delta: {sample_extra}{'...' if len(extra_in_delta) > 3 else ''}")
 
         # Compare data point counts for common parcels
         common_parcels = organized_parcels & delta_parcels
@@ -477,13 +494,16 @@ def _validate_per_parcel_data_points(
             if verbose:
                 # Show first few mismatches as examples
                 for parcel_id, org_count, delta_count in mismatched_parcels[:3]:
-                    typer.echo(f"    ✗ Parcel {parcel_id}: organized={org_count}, delta={delta_count}")
+                    typer.echo(
+                        f"    ✗ Parcel {parcel_id}: organized={org_count}, delta={delta_count}")
                 if len(mismatched_parcels) > 3:
-                    typer.echo(f"    ... and {len(mismatched_parcels) - 3} more parcels with mismatches")
+                    typer.echo(
+                        f"    ... and {len(mismatched_parcels) - 3} more parcels with mismatches")
 
         # Success message if everything matches
         if not issues and verbose:
-            typer.echo(f"    ✓ All {len(common_parcels)} parcels have matching data point counts")
+            typer.echo(
+                f"    ✓ All {len(common_parcels)} parcels have matching data point counts")
 
     except Exception as e:
         issue = f"Partition {partition}: Failed to validate per-parcel data points ({e})"

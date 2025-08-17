@@ -3,14 +3,14 @@ from pathlib import Path
 import duckdb
 import typer
 
-from lake_sandbox.utils.performance import monitor_performance
-from lake_sandbox.validator.models import ChunkFile, ReorganizationProgress
 from lake_sandbox.reorg_pattern.reorganize.validation import (
     check_existing_chunk,
-    verify_file_creation,
-    update_stats,
     get_valid_chunks,
+    update_stats,
+    verify_file_creation,
 )
+from lake_sandbox.utils.performance import monitor_performance
+from lake_sandbox.validator.models import ChunkFile, ReorganizationProgress
 
 
 @monitor_performance()

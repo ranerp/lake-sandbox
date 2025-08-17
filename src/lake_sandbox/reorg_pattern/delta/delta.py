@@ -4,15 +4,14 @@ import duckdb
 import typer
 from deltalake import DeltaTable, write_deltalake
 
-from lake_sandbox.utils.performance import monitor_performance
-from lake_sandbox.validator.models import DeltaConversionProgress, DeltaTableInfo
-from lake_sandbox.reorg_pattern.reorganize.validation import update_stats
 from lake_sandbox.reorg_pattern.delta.validation import (
-    validate_delta_table,
     get_delta_partitions,
-    check_existing_delta_partition,
+    validate_delta_table,
     verify_delta_streaming,
 )
+from lake_sandbox.reorg_pattern.reorganize.validation import update_stats
+from lake_sandbox.utils.performance import monitor_performance
+from lake_sandbox.validator.models import DeltaConversionProgress, DeltaTableInfo
 
 
 @monitor_performance()
@@ -149,7 +148,8 @@ def convert_to_delta_lake(
                 partition_by=["parcel_chunk"]  # Partition by parcel_chunk
             )
 
-            streaming_stats = verify_delta_streaming(chunk_name, len(df), delta_table_path)
+            streaming_stats = verify_delta_streaming(chunk_name, len(df),
+                                                     delta_table_path)
             update_stats(stats, streaming_stats)
 
         except Exception as e:

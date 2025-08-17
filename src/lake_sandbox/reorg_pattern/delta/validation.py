@@ -1,12 +1,13 @@
 """Delta Lake specific validation utilities."""
 
 from pathlib import Path
-from typing import Dict, Optional, Set, Tuple
 
 import typer
 from deltalake import DeltaTable
 
-def validate_delta_table(delta_table_path: Path) -> Tuple[bool, Optional[DeltaTable], Optional[str]]:
+
+def validate_delta_table(delta_table_path: Path) -> tuple[
+    bool, DeltaTable | None, str | None]:
     """Validate a Delta Lake table exists and is accessible.
 
     Args:
@@ -35,7 +36,7 @@ def validate_delta_table(delta_table_path: Path) -> Tuple[bool, Optional[DeltaTa
         return False, None, f"Delta table is corrupted: {e}"
 
 
-def get_delta_partitions(dt: DeltaTable) -> Set[str]:
+def get_delta_partitions(dt: DeltaTable) -> set[str]:
     """Extract partition names from Delta table files.
 
     Args:
@@ -53,8 +54,8 @@ def get_delta_partitions(dt: DeltaTable) -> Set[str]:
 
 
 def check_existing_delta_partition(delta_table_path: Path,
-                                 partition: str,
-                                 force: bool = False) -> Tuple[bool, Dict[str, int]]:
+                                   partition: str,
+                                   force: bool = False) -> tuple[bool, dict[str, int]]:
     """Check if a Delta partition already exists and should be skipped.
 
     Args:
@@ -83,8 +84,8 @@ def check_existing_delta_partition(delta_table_path: Path,
 
 
 def verify_delta_streaming(chunk_name: str,
-                          records_streamed: int,
-                          delta_table_path: Path) -> Dict[str, int]:
+                           records_streamed: int,
+                           delta_table_path: Path) -> dict[str, int]:
     """Verify that streaming to Delta table was successful.
 
     Args:
@@ -102,12 +103,9 @@ def verify_delta_streaming(chunk_name: str,
         return {"failed": 1}
 
     if records_streamed > 0:
-        typer.echo(f"  ✓ Streamed {records_streamed:,} rows from {chunk_name} to Delta table")
+        typer.echo(
+            f"  ✓ Streamed {records_streamed:,} rows from {chunk_name} to Delta table")
         return {"processed": 1}
     else:
         typer.echo(f"  ⚠ Streamed {chunk_name} but no rows were added")
         return {"failed": 1}
-
-
-
-
