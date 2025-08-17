@@ -34,18 +34,24 @@ def cross_validate_organized_chunk(
 
     try:
         # Get organized chunk deduplicated count
-        org_dedup_count = conn.execute(f"""
+        org_dedup_result = conn.execute(f"""
             SELECT COUNT(*) FROM (
                 SELECT DISTINCT parcel_id, date
                 FROM read_parquet('{organized_chunk_file}')
             )
-        """).fetchone()[0]
+        """).fetchone()
+        if org_dedup_result is None:
+            return False, "Failed to query organized chunk record count"
+        org_dedup_count = org_dedup_result[0]
 
         # Get Delta partition record count
-        delta_count = conn.execute(f"""
+        delta_result = conn.execute(f"""
             SELECT COUNT(*) FROM delta_scan('{delta_table_path}')
             WHERE parcel_chunk = '{partition}'
-        """).fetchone()[0]
+        """).fetchone()
+        if delta_result is None:
+            return False, "Failed to query Delta partition record count"
+        delta_count = delta_result[0]
 
         if org_dedup_count != delta_count:
             return (
@@ -90,7 +96,7 @@ def cross_validate_partitions_with_organized(
         List of validation issues found
     """
     typer.echo("\n=== CROSS-VALIDATING WITH ORGANIZED DATA ===")
-    issues = []
+    issues: list[str] = []
 
     organized_path = Path(organized_dir)
     if not organized_path.exists():

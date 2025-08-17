@@ -652,6 +652,7 @@ dev = [
     { name = "pytest" },
     { name = "ruff" },
     { name = "types-psutil" },
+    { name = "types-seaborn" },
 ]
 
 [package.metadata]
@@ -677,6 +678,7 @@ dev = [
     { name = "pytest", specifier = ">=8.4.1" },
     { name = "ruff", specifier = ">=0.12.9" },
     { name = "types-psutil", specifier = ">=7.0.0.20250801" },
+    { name = "types-seaborn", specifier = ">=0.13.2.20250809" },
 ]
 
 [[package]]
@@ -1576,6 +1578,20 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/07/e2/c774f754de26848f53f05defff5bb21dd9375a059d1ba5b5ea943cf8206e/types_pytz-2025.2.0.20250809.tar.gz", hash = "sha256:222e32e6a29bb28871f8834e8785e3801f2dc4441c715cd2082b271eecbe21e5", size = 10876, upload-time = "2025-08-09T03:14:17.453Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/db/d0/91c24fe54e565f2344d7a6821e6c6bb099841ef09007ea6321a0bac0f808/types_pytz-2025.2.0.20250809-py3-none-any.whl", hash = "sha256:4f55ed1b43e925cf851a756fe1707e0f5deeb1976e15bf844bcaa025e8fbd0db", size = 10095, upload-time = "2025-08-09T03:14:16.674Z" },
+]
+
+[[package]]
+name = "types-seaborn"
+version = "0.13.2.20250809"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "matplotlib" },
+    { name = "numpy" },
+    { name = "pandas-stubs" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/03/e7/213e88e625567e62eb3ba843ece9a4fa4cf7938ec7669f6214e2691dbbe7/types_seaborn-0.13.2.20250809.tar.gz", hash = "sha256:10bbdae691ecaddb9ec7c8358132216af671f4c83020fe14e9e5e75b3f142472", size = 29278, upload-time = "2025-08-09T03:17:21.489Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/bc/8a/f2d5f44a90b9932121dce254ddefebb075e83be94a503569e44ee23cd220/types_seaborn-0.13.2.20250809-py3-none-any.whl", hash = "sha256:311fe9a222fa646761d4e5193f28d74335d6aa81ea947bb01e70c3b2484d39ac", size = 40929, upload-time = "2025-08-09T03:17:20.729Z" },
 ]
 
 [[package]]

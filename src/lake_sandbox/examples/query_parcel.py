@@ -48,6 +48,8 @@ def get_dataset_summary(conn: duckdb.DuckDBPyConnection, delta_dir: str) -> dict
     """
 
     result = conn.execute(query).fetchone()
+    if result is None:
+        raise ValueError("Failed to query dataset summary")
 
     return {
         "total_records": result[0],

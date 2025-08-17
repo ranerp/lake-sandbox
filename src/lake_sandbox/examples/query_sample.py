@@ -63,6 +63,8 @@ def get_random_time_window(
     """
 
     result = conn.execute(query).fetchone()
+    if result is None:
+        raise ValueError("Failed to query time window")
     start_date, end_date = result
 
     if not start_date or not end_date:

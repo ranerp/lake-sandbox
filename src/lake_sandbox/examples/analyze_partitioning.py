@@ -91,6 +91,8 @@ def analyze_partition_distribution(
     """
 
     total_result = conn.execute(total_query).fetchone()
+    if total_result is None:
+        raise ValueError("Failed to query total statistics")
 
     return {
         "partition_stats": df,

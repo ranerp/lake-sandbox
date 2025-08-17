@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import Literal
 
 import duckdb
 import typer
@@ -93,7 +94,7 @@ def convert_to_delta_lake(
     if delta_table_path.exists() and not force:
         is_valid, dt, error = validate_delta_table(delta_table_path)
 
-        if is_valid:
+        if is_valid and dt is not None:
             version = dt.version()
             file_count = len(dt.files())
             typer.echo(f"✓ Delta table exists (version {version}, {file_count} files)")
@@ -142,15 +143,15 @@ def convert_to_delta_lake(
 
             # Determine write mode for this chunk
             if first_chunk:
-                write_mode = "overwrite" if not table_exists or force else "append"
+                write_mode: Literal["overwrite", "append"] = "overwrite" if not table_exists or force else "append"
                 first_chunk = False
             else:
                 write_mode = "append"
 
             # Stream this chunk directly to Delta table
             write_deltalake(
-                str(delta_table_path),
-                df,
+                table_or_uri=str(delta_table_path),
+                data=df,
                 mode=write_mode,
                 partition_by=["parcel_chunk"],  # Partition by parcel_chunk
             )

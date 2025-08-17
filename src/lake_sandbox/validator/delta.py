@@ -88,14 +88,14 @@ def validate_partitioned_delta_table(
         # Validate Delta table
         is_valid, dt, error = validate_delta_table(Path(delta_table_path))
 
-        if not is_valid:
+        if not is_valid or dt is None:
             return DeltaValidationResult(
                 valid=False,
                 total_tables=1,
                 table_details=[],
                 total_unique_parcels=0,
                 total_records=0,
-                issues=[error],
+                issues=[error] if error is not None else [],
                 error=error,
             )
 
@@ -286,7 +286,7 @@ def _cross_validate_with_organized_data(
         List of validation issues found
     """
     typer.echo("\n=== CROSS-VALIDATING WITH ORGANIZED DATA ===")
-    issues = []
+    issues: list[str] = []
 
     organized_path = Path(organized_dir)
     if not organized_path.exists():
@@ -350,7 +350,7 @@ def _validate_partition_vs_chunk(
     Returns:
         List of validation issues for this partition
     """
-    issues = []
+    issues: list[str] = []
 
     chunk_dir = organized_path / f"parcel_chunk={partition}"
     chunk_file = chunk_dir / "data.parquet"
@@ -438,7 +438,7 @@ def _validate_per_parcel_data_points(
     Returns:
         List of validation issues for per-parcel data points
     """
-    issues = []
+    issues: list[str] = []
 
     try:
         # Get data points per parcel from organized chunk (deduplicated)

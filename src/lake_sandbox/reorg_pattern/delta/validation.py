@@ -70,7 +70,7 @@ def check_existing_delta_partition(
         return False, {}
 
     is_valid, dt, error = validate_delta_table(delta_table_path)
-    if not is_valid:
+    if not is_valid or dt is None:
         return False, {}
 
     existing_partitions = get_delta_partitions(dt)
