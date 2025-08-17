@@ -3,7 +3,7 @@ from pathlib import Path
 import duckdb
 import typer
 
-from lake_sandbox.reorg_pattern.delta.partition_manager import get_delta_partitions
+from lake_sandbox.reorg_pattern.delta.delta_partitions import get_delta_partitions
 from lake_sandbox.reorg_pattern.delta.validation import validate_delta_table
 from lake_sandbox.utils.performance import monitor_performance
 from lake_sandbox.validator.cross_validation import (

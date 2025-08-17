@@ -5,7 +5,7 @@ import duckdb
 import typer
 from deltalake import DeltaTable, write_deltalake
 
-from lake_sandbox.reorg_pattern.delta.partition_manager import (
+from lake_sandbox.reorg_pattern.delta.delta_partitions import (
     DeltaTableState,
     check_skip_partition,
     extract_partition_id,
