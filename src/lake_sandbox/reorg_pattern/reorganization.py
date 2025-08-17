@@ -1,10 +1,10 @@
 import typer
 
-from lake_sandbox.reorg_pattern.phase1_reorganize import (
+from lake_sandbox.reorg_pattern.reorganize.reorg import (
     get_reorganization_progress,
     reorganize_by_parcel_chunks,
 )
-from lake_sandbox.reorg_pattern.phase2_delta import (
+from lake_sandbox.reorg_pattern.delta.delta import (
     convert_to_delta_lake,
     get_delta_conversion_progress,
     optimize_all_delta_tables,

@@ -5,6 +5,12 @@ import typer
 
 from lake_sandbox.utils.performance import monitor_performance
 from lake_sandbox.validator.models import ChunkFile, ReorganizationProgress
+from lake_sandbox.reorg_pattern.reorganize.validation import (
+    check_existing_chunk,
+    verify_file_creation,
+    update_stats,
+    get_valid_chunks,
+)
 
 
 @monitor_performance()
@@ -70,8 +76,10 @@ def reorganize_by_parcel_chunks(
     sample_file = str(parquet_files[0])
     sample_result = conn.execute(
         f"SELECT COUNT(*) FROM read_parquet('{sample_file}')").fetchone()
+
     if sample_result is None:
         raise ValueError("Sample query returned no results")
+
     sample_count = sample_result[0]
     total_chunks = (sample_count + chunk_size - 1) // chunk_size  # Round up
 
@@ -95,25 +103,12 @@ def reorganize_by_parcel_chunks(
         # Check if chunk already exists and is valid
         chunk_file = chunk_dir / "data.parquet"
 
-        if chunk_file.exists() and not force:
-            try:
-                # Verify existing file is valid and has data
-                existing_result = conn.execute(
-                    f"SELECT COUNT(*) FROM read_parquet('{chunk_file}')").fetchone()
-                if existing_result is None:
-                    raise ValueError("Existing chunk query returned no results")
-                existing_count = existing_result[0]
-                if existing_count > 0:
-                    typer.echo(
-                        f"  ✓ Skipping existing chunk {chunk_id:02d} ({existing_count:,} rows)")
-                    stats["skipped"] += 1
-                    continue
-                else:
-                    typer.echo(
-                        f"  ⚠ Existing chunk {chunk_id:02d} is empty, recreating...")
-            except Exception as e:
-                typer.echo(
-                    f"  ⚠ Existing chunk {chunk_id:02d} is corrupted ({e}), recreating...")
+        should_skip, skip_stats = check_existing_chunk(
+            chunk_file, f"{chunk_id:02d}", conn, force
+        )
+        if should_skip:
+            update_stats(stats, skip_stats)
+            continue
 
         try:
             # Extract data for this specific parcel chunk
@@ -140,26 +135,13 @@ def reorganize_by_parcel_chunks(
                 ) TO '{chunk_file}' (FORMAT PARQUET)
             """)
 
-            # Verify file was created and get row count
-            if chunk_file.exists():
-                row_result = conn.execute(
-                    f"SELECT COUNT(*) FROM read_parquet('{chunk_file}')").fetchone()
-                if row_result is None:
-                    raise ValueError("Row count query returned no results")
-                row_count = row_result[0]
-                if row_count > 0:
-                    typer.echo(f"  ✓ Created {chunk_file.name} with {row_count:,} rows")
-                    stats["created"] += 1
-                else:
-                    typer.echo(f"  ⚠ Created {chunk_file.name} but it's empty")
-                    stats["failed"] += 1
-            else:
-                typer.echo(f"  ✗ Failed to create {chunk_file.name}")
-                stats["failed"] += 1
+            # Verify file was created and update statistics
+            creation_stats = verify_file_creation(chunk_file, f"{chunk_id:02d}", conn)
+            update_stats(stats, creation_stats)
 
         except Exception as e:
             typer.echo(f"  ✗ Failed to process chunk {chunk_id:02d}: {e}")
-            stats["failed"] += 1
+            update_stats(stats, {"failed": 1})
 
     conn.close()
 
@@ -181,39 +163,22 @@ def get_reorganization_progress(output_dir: str) -> ReorganizationProgress:
     Returns:
         Dictionary with progress info: {'existing_chunks': int, 'chunk_files': list}
     """
-    output_path = Path(output_dir)
-    if not output_path.exists():
-        return ReorganizationProgress(existing_chunks=0, chunk_files=[])
-
-    chunk_dirs = [d for d in output_path.iterdir() if
-                  d.is_dir() and d.name.startswith("parcel_chunk=")]
-    valid_chunks: list[ChunkFile] = []
-
     conn = duckdb.connect()
 
-    for chunk_dir in sorted(chunk_dirs):
-        data_file = chunk_dir / "data.parquet"
-        if data_file.exists():
-            try:
-                # Verify file is valid
-                count_result = conn.execute(
-                    f"SELECT COUNT(*) FROM read_parquet('{data_file}')").fetchone()
-                if count_result is None:
-                    continue
-                count = count_result[0]
-                if count > 0:
-                    valid_chunks.append(ChunkFile(
-                        chunk_id=chunk_dir.name,
-                        file_path=str(data_file),
-                        row_count=count
-                    ))
-            except Exception:
-                # File exists but is corrupted
-                pass
+    try:
+        valid_chunk_data = get_valid_chunks(output_dir, conn)
+        valid_chunks = [
+            ChunkFile(
+                chunk_id=chunk["chunk_id"],
+                file_path=chunk["file_path"],
+                row_count=chunk["row_count"]
+            )
+            for chunk in valid_chunk_data
+        ]
 
-    conn.close()
-
-    return ReorganizationProgress(
-        existing_chunks=len(valid_chunks),
-        chunk_files=valid_chunks
-    )
+        return ReorganizationProgress(
+            existing_chunks=len(valid_chunks),
+            chunk_files=valid_chunks
+        )
+    finally:
+        conn.close()

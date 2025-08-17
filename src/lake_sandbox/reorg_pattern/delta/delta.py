@@ -6,6 +6,13 @@ from deltalake import DeltaTable, write_deltalake
 
 from lake_sandbox.utils.performance import monitor_performance
 from lake_sandbox.validator.models import DeltaConversionProgress, DeltaTableInfo
+from lake_sandbox.reorg_pattern.reorganize.validation import update_stats
+from lake_sandbox.reorg_pattern.delta.validation import (
+    validate_delta_table,
+    get_delta_partitions,
+    check_existing_delta_partition,
+    verify_delta_streaming,
+)
 
 
 @monitor_performance()
@@ -75,30 +82,21 @@ def convert_to_delta_lake(
 
     # Check if Delta table already exists
     table_exists = False
+    existing_partitions = set()
+    
     if delta_table_path.exists() and not force:
-        try:
-            dt = DeltaTable(str(delta_table_path))
+        is_valid, dt, error = validate_delta_table(delta_table_path)
+        
+        if is_valid:
             version = dt.version()
             file_count = len(dt.files())
-
-            if file_count > 0:
-                typer.echo(
-                    f"✓ Delta table exists (version {version}, {file_count} files)")
-                table_exists = True
-
-                # Check which partitions already exist
-                existing_partitions = set()
-                for file_info in dt.files():
-                    # Extract partition info from file path
-                    if "parcel_chunk=" in file_info:
-                        partition = file_info.split("parcel_chunk=")[1].split("/")[0]
-                        existing_partitions.add(f"parcel_chunk={partition}")
-
-                typer.echo(f"Found {len(existing_partitions)} existing partitions")
-            else:
-                typer.echo("⚠ Existing Delta table has no files, recreating...")
-        except Exception as e:
-            typer.echo(f"⚠ Existing Delta table is corrupted ({e}), recreating...")
+            typer.echo(f"✓ Delta table exists (version {version}, {file_count} files)")
+            table_exists = True
+            
+            existing_partitions = get_delta_partitions(dt)
+            typer.echo(f"Found {len(existing_partitions)} existing partitions")
+        else:
+            typer.echo(f"⚠ {error}, recreating...")
 
     # Process each chunk and stream to Delta table
     first_chunk = True
@@ -110,13 +108,14 @@ def convert_to_delta_lake(
         data_file = chunk_dir / "data.parquet"
         if not data_file.exists():
             typer.echo(f"  ✗ Skipping {chunk_name} - no data.parquet found")
-            stats["failed"] += 1
+            update_stats(stats, {"failed": 1})
             continue
 
         # Skip if partition already exists and not forcing
-        if table_exists and not force and chunk_name in existing_partitions:
+        partition_id = chunk_name.split('=')[1]
+        if table_exists and not force and partition_id in existing_partitions:
             typer.echo(f"  ✓ Skipping {chunk_name} - partition already exists")
-            stats["skipped"] += 1
+            update_stats(stats, {"skipped": 1})
             continue
 
         try:
@@ -132,7 +131,7 @@ def convert_to_delta_lake(
 
             if df.empty:
                 typer.echo(f"  ✗ Skipping {chunk_name} - empty dataset")
-                stats["failed"] += 1
+                update_stats(stats, {"failed": 1})
                 continue
 
             # Determine write mode for this chunk
@@ -150,12 +149,12 @@ def convert_to_delta_lake(
                 partition_by=["parcel_chunk"]  # Partition by parcel_chunk
             )
 
-            typer.echo(f"  ✓ Streamed {len(df):,} rows from {chunk_name} to Delta table")
-            stats["processed"] += 1
+            streaming_stats = verify_delta_streaming(chunk_name, len(df), delta_table_path)
+            update_stats(stats, streaming_stats)
 
         except Exception as e:
             typer.echo(f"  ✗ Failed to stream {chunk_name} to Delta table: {e}")
-            stats["failed"] += 1
+            update_stats(stats, {"failed": 1})
 
     # Verify final Delta table state
     if stats["processed"] > 0:

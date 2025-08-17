@@ -2,10 +2,14 @@ from pathlib import Path
 
 import duckdb
 import typer
-from deltalake import DeltaTable
 
 from lake_sandbox.utils.performance import monitor_performance
 from lake_sandbox.validator.models import DeltaValidationResult, TableDetail
+from lake_sandbox.reorg_pattern.delta.validation import (
+    validate_delta_table,
+    get_delta_partitions,
+)
+from lake_sandbox.validator.cross_validation import cross_validate_partitions_with_organized
 
 
 @monitor_performance()
@@ -77,28 +81,25 @@ def validate_partitioned_delta_table(
     """
 
     try:
-        # Load Delta table
-        dt = DeltaTable(delta_table_path)
-        version = dt.version()
-        file_count = len(dt.files())
+        # Validate Delta table
+        is_valid, dt, error = validate_delta_table(Path(delta_table_path))
 
-        if file_count == 0:
+        if not is_valid:
             return DeltaValidationResult(
                 valid=False,
                 total_tables=1,
                 table_details=[],
                 total_unique_parcels=0,
                 total_records=0,
-                issues=["No data files in Delta table"],
-                error="Empty Delta table"
+                issues=[error],
+                error=error
             )
 
+        version = dt.version()
+        file_count = len(dt.files())
+
         # Get partitions information
-        partitions = set()
-        for file_info in dt.files():
-            if "parcel_chunk=" in file_info:
-                partition = file_info.split("parcel_chunk=")[1].split("/")[0]
-                partitions.add(partition)
+        partitions = get_delta_partitions(dt)
 
         typer.echo(f"Found {len(partitions)} partitions: {sorted(partitions)}")
 
@@ -200,8 +201,8 @@ def validate_partitioned_delta_table(
 
         # Cross-validate with organized data if available
         if organized_dir:
-            cross_validation_issues = _cross_validate_with_organized_data(
-                delta_table_path, partitions, organized_dir, conn, verbose
+            cross_validation_issues = cross_validate_partitions_with_organized(
+                Path(delta_table_path), partitions, organized_dir, conn, verbose
             )
             issues.extend(cross_validation_issues)
 
