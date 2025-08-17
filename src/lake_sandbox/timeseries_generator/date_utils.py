@@ -2,8 +2,9 @@ import itertools
 from datetime import datetime, timedelta
 
 
-def parse_date_range(start_date: str, end_date: str, interval_days: int = 7) -> list[
-    datetime]:
+def parse_date_range(
+    start_date: str, end_date: str, interval_days: int = 7
+) -> list[datetime]:
     """Parse date range and generate list of dates at specified intervals.
 
     Args:

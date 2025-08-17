@@ -13,29 +13,35 @@ from lake_sandbox.validator.validation import validate
 app = typer.Typer(help="Lake Sandbox CLI - Various utilities and tools")
 
 # Register subcommands
-app.command("reorg",
-            help="Reorganize raw timeseries data from date-partitioned to parcel-chunk-partitioned format and convert to Delta Lake")(
-    reorg)
+app.command(
+    "reorg",
+    help="Reorganize raw timeseries data from date-partitioned to parcel-chunk-partitioned format and convert to Delta Lake",
+)(reorg)
 app.command("streaming-assembly")(streaming_assembly)
 app.command("generate-timeseries")(generate_timeseries)
-app.command("validate",
-            help="Validate organized chunks and Delta tables for data integrity")(
-    validate)
-app.command("pipeline",
-            help="Run the complete data pipeline: generate -> reorganize -> validate")(
-    run_pipeline_cli)
-app.command("analyze",
-            help="Analyze DeltaLake timeseries data using DuckDB and create visualizations")(
-    analyze_data)
-app.command("query-parcel",
-            help="Query and display a single parcel timeseries from Delta Lake data")(
-    query_parcel)
-app.command("query-sample",
-            help="Query random parcels within a random time window from Delta Lake data")(
-    query_sample)
-app.command("analyze-partitioning",
-            help="Analyze Delta Lake partitioning performance and efficiency")(
-    analyze_partitioning)
+app.command(
+    "validate", help="Validate organized chunks and Delta tables for data integrity"
+)(validate)
+app.command(
+    "pipeline",
+    help="Run the complete data pipeline: generate -> reorganize -> validate",
+)(run_pipeline_cli)
+app.command(
+    "analyze",
+    help="Analyze DeltaLake timeseries data using DuckDB and create visualizations",
+)(analyze_data)
+app.command(
+    "query-parcel",
+    help="Query and display a single parcel timeseries from Delta Lake data",
+)(query_parcel)
+app.command(
+    "query-sample",
+    help="Query random parcels within a random time window from Delta Lake data",
+)(query_sample)
+app.command(
+    "analyze-partitioning",
+    help="Analyze Delta Lake partitioning performance and efficiency",
+)(analyze_partitioning)
 
 
 def main() -> None:

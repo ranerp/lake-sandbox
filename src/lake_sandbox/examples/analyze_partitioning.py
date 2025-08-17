@@ -12,8 +12,7 @@ from rich.table import Table
 from lake_sandbox.utils.performance import monitor_performance
 
 
-def connect_to_deltalake(
-    delta_dir: str = "./output/timeseries-delta") -> duckdb.DuckDBPyConnection:
+def connect_to_deltalake() -> duckdb.DuckDBPyConnection:
     """Connect to DeltaLake data using DuckDB."""
     conn = duckdb.connect()
 
@@ -25,9 +24,9 @@ def connect_to_deltalake(
 
 
 @monitor_performance()
-def test_parcel_query_performance(conn: duckdb.DuckDBPyConnection,
-                                  delta_dir: str,
-                                  sample_parcel_ids: list[str]) -> dict:
+def test_parcel_query_performance(
+    conn: duckdb.DuckDBPyConnection, delta_dir: str, sample_parcel_ids: list[str]
+) -> dict:
     """Test query performance for different parcel ID queries."""
     delta_path = Path(delta_dir).absolute()
     delta_table_path = delta_path / "parcel_data"
@@ -52,15 +51,16 @@ def test_parcel_query_performance(conn: duckdb.DuckDBPyConnection,
 
         results[parcel_id] = {
             "records": result[0] if result else 0,
-            "query_time": query_time
+            "query_time": query_time,
         }
 
     return results
 
 
 @monitor_performance()
-def analyze_partition_distribution(conn: duckdb.DuckDBPyConnection,
-                                   delta_dir: str) -> dict:
+def analyze_partition_distribution(
+    conn: duckdb.DuckDBPyConnection, delta_dir: str
+) -> dict:
     """Analyze how parcels are distributed across partitions."""
     delta_path = Path(delta_dir).absolute()
     delta_table_path = delta_path / "parcel_data"
@@ -96,7 +96,7 @@ def analyze_partition_distribution(conn: duckdb.DuckDBPyConnection,
         "partition_stats": df,
         "total_records": total_result[0],
         "total_parcels": total_result[1],
-        "total_partitions": total_result[2]
+        "total_partitions": total_result[2],
     }
 
 
@@ -129,12 +129,12 @@ def test_partition_pruning(conn: duckdb.DuckDBPyConnection, delta_dir: str) -> d
     return {
         "partition_query": {
             "records": partition_result[0] if partition_result else 0,
-            "time": partition_time
+            "time": partition_time,
         },
         "cross_partition_query": {
             "records": cross_result[0] if cross_result else 0,
-            "time": cross_time
-        }
+            "time": cross_time,
+        },
     }
 
 
@@ -142,8 +142,11 @@ def display_partition_analysis(analysis: dict, console: Console):
     """Display partition distribution analysis."""
     stats = analysis["partition_stats"]
 
-    table = Table(title="Partition Distribution Analysis", show_header=True,
-                  header_style="bold magenta")
+    table = Table(
+        title="Partition Distribution Analysis",
+        show_header=True,
+        header_style="bold magenta",
+    )
     table.add_column("Partition", style="cyan", width=10)
     table.add_column("Records", style="green", width=12)
     table.add_column("Parcels", style="yellow", width=10)
@@ -152,11 +155,11 @@ def display_partition_analysis(analysis: dict, console: Console):
 
     for _, row in stats.head(10).iterrows():
         table.add_row(
-            row['parcel_chunk'],
+            row["parcel_chunk"],
             f"{row['total_records']:,}",
             f"{row['unique_parcels']:,}",
             f"{row['unique_dates']}",
-            f"{row['min_date']} to {row['max_date']}"
+            f"{row['min_date']} to {row['max_date']}",
         )
 
     if len(stats) > 10:
@@ -165,44 +168,50 @@ def display_partition_analysis(analysis: dict, console: Console):
     console.print(table)
 
     # Summary
-    summary_table = Table(title="Summary Statistics", show_header=True,
-                          header_style="bold cyan")
+    summary_table = Table(
+        title="Summary Statistics", show_header=True, header_style="bold cyan"
+    )
     summary_table.add_column("Metric", style="cyan")
     summary_table.add_column("Value", style="green")
 
     summary_table.add_row("Total Records", f"{analysis['total_records']:,}")
     summary_table.add_row("Total Parcels", f"{analysis['total_parcels']:,}")
     summary_table.add_row("Total Partitions", f"{analysis['total_partitions']}")
-    summary_table.add_row("Avg Records/Partition",
-                          f"{analysis['total_records'] // analysis['total_partitions']:,}")
-    summary_table.add_row("Avg Parcels/Partition",
-                          f"{analysis['total_parcels'] // analysis['total_partitions']:,}")
+    summary_table.add_row(
+        "Avg Records/Partition",
+        f"{analysis['total_records'] // analysis['total_partitions']:,}",
+    )
+    summary_table.add_row(
+        "Avg Parcels/Partition",
+        f"{analysis['total_parcels'] // analysis['total_partitions']:,}",
+    )
 
     console.print(summary_table)
 
 
-def display_performance_results(parcel_results: dict, pruning_results: dict,
-                                console: Console):
+def display_performance_results(
+    parcel_results: dict, pruning_results: dict, console: Console
+):
     """Display query performance results."""
     # Parcel query performance
-    perf_table = Table(title="Parcel Query Performance", show_header=True,
-                       header_style="bold red")
+    perf_table = Table(
+        title="Parcel Query Performance", show_header=True, header_style="bold red"
+    )
     perf_table.add_column("Parcel ID", style="yellow", width=15)
     perf_table.add_column("Records", style="green", width=10)
     perf_table.add_column("Query Time (ms)", style="red", width=15)
 
     for parcel_id, result in parcel_results.items():
         perf_table.add_row(
-            parcel_id,
-            f"{result['records']:,}",
-            f"{result['query_time'] * 1000:.1f}"
+            parcel_id, f"{result['records']:,}", f"{result['query_time'] * 1000:.1f}"
         )
 
     console.print(perf_table)
 
     # Partition pruning comparison
-    pruning_table = Table(title="Partition Pruning Analysis", show_header=True,
-                          header_style="bold blue")
+    pruning_table = Table(
+        title="Partition Pruning Analysis", show_header=True, header_style="bold blue"
+    )
     pruning_table.add_column("Query Type", style="cyan", width=20)
     pruning_table.add_column("Records", style="green", width=12)
     pruning_table.add_column("Time (ms)", style="red", width=12)
@@ -212,13 +221,13 @@ def display_performance_results(parcel_results: dict, pruning_results: dict,
         "Single Partition",
         f"{pruning_results['partition_query']['records']:,}",
         f"{pruning_results['partition_query']['time'] * 1000:.1f}",
-        "1 (partition pruned)"
+        "1 (partition pruned)",
     )
     pruning_table.add_row(
         "Cross-Partition",
         f"{pruning_results['cross_partition_query']['records']:,}",
         f"{pruning_results['cross_partition_query']['time'] * 1000:.1f}",
-        "All (no pruning)"
+        "All (no pruning)",
     )
 
     console.print(pruning_table)
@@ -226,13 +235,15 @@ def display_performance_results(parcel_results: dict, pruning_results: dict,
 
 def analyze_partitioning(
     delta_dir: str = typer.Option(
-        "output/timeseries-delta", "--delta-dir",
-        help="Path to Delta Lake data directory"
+        "output/timeseries-delta",
+        "--delta-dir",
+        help="Path to Delta Lake data directory",
     ),
     num_test_parcels: int = typer.Option(
-        5, "--num-test-parcels",
-        help="Number of random parcels to test query performance"
-    )
+        5,
+        "--num-test-parcels",
+        help="Number of random parcels to test query performance",
+    ),
 ) -> None:
     """Analyze Delta Lake partitioning performance and efficiency.
 
@@ -256,11 +267,12 @@ def analyze_partitioning(
     try:
         # Connect to Delta Lake
         console.print(f"Connecting to Delta Lake at: {delta_dir}")
-        conn = connect_to_deltalake(delta_dir)
+        conn = connect_to_deltalake()
 
         # Get sample parcel IDs for testing
         console.print(
-            f"Selecting {num_test_parcels} random parcels for performance testing...")
+            f"Selecting {num_test_parcels} random parcels for performance testing..."
+        )
 
         delta_path = Path(delta_dir).absolute()
         delta_table_path = delta_path / "parcel_data"
@@ -294,9 +306,10 @@ def analyze_partitioning(
 
         # Recommendations
         console.print("\n" + "=" * 60)
-        avg_parcel_time = sum(r['query_time'] for r in parcel_results.values()) / len(
-            parcel_results)
-        partition_time = pruning_results['partition_query']['time']
+        avg_parcel_time = sum(r["query_time"] for r in parcel_results.values()) / len(
+            parcel_results
+        )
+        partition_time = pruning_results["partition_query"]["time"]
 
         recommendations = Panel(
             f"""Current partitioning by parcel_chunk provides:
@@ -317,7 +330,7 @@ RECOMMENDATIONS:
 3. For OLTP workloads: Consider partitioning by parcel_id ranges
 4. Current setup is optimal for analytical workloads on full dataset""",
             title="Partitioning Assessment",
-            style="yellow"
+            style="yellow",
         )
 
         console.print(recommendations)
@@ -329,7 +342,7 @@ RECOMMENDATIONS:
 
     except Exception as e:
         console.print(f"Error during analysis: {e}", style="bold red")
-        raise typer.Exit(1)
+        raise typer.Exit(1) from e
 
 
 if __name__ == "__main__":

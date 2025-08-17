@@ -58,7 +58,9 @@ def generate_timeseries(
             date_str = date.strftime("%Y-%m-%d")
 
             # Create partitioned directory structure: utm_tile=XXX/year=YYYY/date=YYYY-MM-DD/
-            partition_path = output_path / f"utm_tile={tile}" / f"year={year}" / f"date={date_str}"
+            partition_path = (
+                output_path / f"utm_tile={tile}" / f"year={year}" / f"date={date_str}"
+            )
             partition_path.mkdir(parents=True, exist_ok=True)
 
             filename = f"{tile}_{date_str}.parquet"
@@ -67,8 +69,8 @@ def generate_timeseries(
             conn = duckdb.connect()
 
             # Set deterministic seed based on tile and date for consistent data
-            seed = abs(hash(f"{tile}_{date_str}")) % 2 ** 31
-            conn.execute(f"SELECT setseed({seed / 2 ** 31})")
+            seed = abs(hash(f"{tile}_{date_str}")) % 2**31
+            conn.execute(f"SELECT setseed({seed / 2**31})")
 
             # Generate synthetic timeseries data using DuckDB's vectorized functions
             conn.execute(f"""

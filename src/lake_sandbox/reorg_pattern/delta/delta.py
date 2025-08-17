@@ -48,8 +48,11 @@ def convert_to_delta_lake(
         raise typer.Exit(1)
 
     # Find all parcel chunk directories
-    chunk_dirs = [d for d in input_path.iterdir() if
-                  d.is_dir() and d.name.startswith("parcel_chunk=")]
+    chunk_dirs = [
+        d
+        for d in input_path.iterdir()
+        if d.is_dir() and d.name.startswith("parcel_chunk=")
+    ]
     if not chunk_dirs:
         typer.echo(f"Error: No parcel_chunk directories found in {input_dir}")
         raise typer.Exit(1)
@@ -64,8 +67,12 @@ def convert_to_delta_lake(
             typer.echo(f"  {status} {chunk_dir.name}")
         if len(chunk_dirs) > 5:
             typer.echo(f"  ... and {len(chunk_dirs) - 5} more chunks")
-        return {"total_chunks": len(chunk_dirs), "processed": 0, "skipped": 0,
-                "failed": 0}
+        return {
+            "total_chunks": len(chunk_dirs),
+            "processed": 0,
+            "skipped": 0,
+            "failed": 0,
+        }
 
     # Create Delta directory
     delta_path = Path(delta_dir)
@@ -111,7 +118,7 @@ def convert_to_delta_lake(
             continue
 
         # Skip if partition already exists and not forcing
-        partition_id = chunk_name.split('=')[1]
+        partition_id = chunk_name.split("=")[1]
         if table_exists and not force and partition_id in existing_partitions:
             typer.echo(f"  ✓ Skipping {chunk_name} - partition already exists")
             update_stats(stats, {"skipped": 1})
@@ -123,7 +130,7 @@ def convert_to_delta_lake(
             df = conn.execute(f"""
                 SELECT
                     DISTINCT ON (parcel_id, date) *,
-                    '{chunk_name.split('=')[1]}' as parcel_chunk
+                    '{chunk_name.split("=")[1]}' as parcel_chunk
                 FROM read_parquet('{data_file}')
                 ORDER BY parcel_id, date
             """).fetchdf()
@@ -145,11 +152,12 @@ def convert_to_delta_lake(
                 str(delta_table_path),
                 df,
                 mode=write_mode,
-                partition_by=["parcel_chunk"]  # Partition by parcel_chunk
+                partition_by=["parcel_chunk"],  # Partition by parcel_chunk
             )
 
-            streaming_stats = verify_delta_streaming(chunk_name, len(df),
-                                                     delta_table_path)
+            streaming_stats = verify_delta_streaming(
+                chunk_name, len(df), delta_table_path
+            )
             update_stats(stats, streaming_stats)
 
         except Exception as e:
@@ -185,8 +193,9 @@ def convert_to_delta_lake(
     return stats
 
 
-def get_delta_conversion_progress(input_dir: str,
-                                  delta_dir: str) -> DeltaConversionProgress:
+def get_delta_conversion_progress(
+    input_dir: str, delta_dir: str
+) -> DeltaConversionProgress:
     """Check progress of Delta conversion by comparing parquet chunks to partitioned Delta table.
 
     Args:
@@ -200,24 +209,30 @@ def get_delta_conversion_progress(input_dir: str,
     delta_path = Path(delta_dir)
 
     if not input_path.exists():
-        return DeltaConversionProgress(total_chunks=0, existing_delta_tables=0,
-                                       delta_tables=[])
+        return DeltaConversionProgress(
+            total_chunks=0, existing_delta_tables=0, delta_tables=[]
+        )
 
     # Count total parcel chunks available for conversion
-    chunk_dirs = [d for d in input_path.iterdir() if
-                  d.is_dir() and d.name.startswith("parcel_chunk=")]
+    chunk_dirs = [
+        d
+        for d in input_path.iterdir()
+        if d.is_dir() and d.name.startswith("parcel_chunk=")
+    ]
     total_chunks = len(chunk_dirs)
 
     if not delta_path.exists():
-        return DeltaConversionProgress(total_chunks=total_chunks,
-                                       existing_delta_tables=0, delta_tables=[])
+        return DeltaConversionProgress(
+            total_chunks=total_chunks, existing_delta_tables=0, delta_tables=[]
+        )
 
     # Check for the single partitioned Delta table
     delta_table_path = delta_path / "parcel_data"
 
     if not delta_table_path.exists():
-        return DeltaConversionProgress(total_chunks=total_chunks,
-                                       existing_delta_tables=0, delta_tables=[])
+        return DeltaConversionProgress(
+            total_chunks=total_chunks, existing_delta_tables=0, delta_tables=[]
+        )
 
     try:
         # Verify partitioned Delta table is valid
@@ -238,23 +253,25 @@ def get_delta_conversion_progress(input_dir: str,
                 chunk_id="parcel_data (partitioned)",
                 path=str(delta_table_path),
                 version=version,
-                file_count=file_count
+                file_count=file_count,
             )
 
             return DeltaConversionProgress(
                 total_chunks=total_chunks,
                 existing_delta_tables=len(existing_partitions),
                 # Number of partitions, not tables
-                delta_tables=[delta_table_info]
+                delta_tables=[delta_table_info],
             )
         else:
-            return DeltaConversionProgress(total_chunks=total_chunks,
-                                           existing_delta_tables=0, delta_tables=[])
+            return DeltaConversionProgress(
+                total_chunks=total_chunks, existing_delta_tables=0, delta_tables=[]
+            )
 
     except Exception:
         # Directory exists but is not a valid Delta table
-        return DeltaConversionProgress(total_chunks=total_chunks,
-                                       existing_delta_tables=0, delta_tables=[])
+        return DeltaConversionProgress(
+            total_chunks=total_chunks, existing_delta_tables=0, delta_tables=[]
+        )
 
 
 def optimize_delta_table(delta_table_path: str, dry_run: bool = False) -> bool:
