@@ -36,21 +36,6 @@ def validate_delta_table(
         return False, None, f"Delta table is corrupted: {e}"
 
 
-def get_delta_partitions(dt: DeltaTable) -> set[str]:
-    """Extract partition names from Delta table files.
-
-    Args:
-        dt: DeltaTable object
-
-    Returns:
-        Set of partition identifiers
-    """
-    partitions = set()
-    for file_info in dt.files():
-        if "parcel_chunk=" in file_info:
-            partition = file_info.split("parcel_chunk=")[1].split("/")[0]
-            partitions.add(partition)
-    return partitions
 
 
 def verify_delta_streaming(

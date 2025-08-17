@@ -9,6 +9,7 @@ from lake_sandbox.reorg_pattern.delta.partition_manager import (
     DeltaTableState,
     check_skip_partition,
     extract_partition_id,
+    get_delta_partitions,
     get_table_info,
 )
 from lake_sandbox.reorg_pattern.delta.validation import (
@@ -246,11 +247,7 @@ def get_delta_conversion_progress(
 
         if file_count > 0:
             # Count existing partitions
-            existing_partitions = set()
-            for file_info in dt.files():
-                if "parcel_chunk=" in file_info:
-                    partition = file_info.split("parcel_chunk=")[1].split("/")[0]
-                    existing_partitions.add(partition)
+            existing_partitions = get_delta_partitions(dt)
 
             # Create table info for the partitioned table
             delta_table_info = DeltaTableInfo(

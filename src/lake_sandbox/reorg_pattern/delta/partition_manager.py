@@ -6,10 +6,7 @@ from pathlib import Path
 import typer
 from deltalake import DeltaTable
 
-from lake_sandbox.reorg_pattern.delta.validation import (
-    get_delta_partitions,
-    validate_delta_table,
-)
+from lake_sandbox.reorg_pattern.delta.validation import validate_delta_table
 
 
 def extract_partition_id(chunk_name: str) -> str:
@@ -36,6 +33,35 @@ def format_partition_name(partition_id: str) -> str:
         Full partition name (e.g., 'parcel_chunk=00')
     """
     return f"parcel_chunk={partition_id}"
+
+
+def get_chunk_directory_name(chunk_id: int) -> str:
+    """Get standardized chunk directory name.
+    
+    Args:
+        chunk_id: Numeric chunk ID
+        
+    Returns:
+        Formatted directory name (e.g., 'parcel_chunk=00')
+    """
+    return f"parcel_chunk={chunk_id:02d}"
+
+
+def get_delta_partitions(dt: DeltaTable) -> set[str]:
+    """Extract partition names from Delta table files.
+
+    Args:
+        dt: DeltaTable object
+
+    Returns:
+        Set of partition identifiers
+    """
+    partitions = set()
+    for file_info in dt.files():
+        if "parcel_chunk=" in file_info:
+            partition = file_info.split("parcel_chunk=")[1].split("/")[0]
+            partitions.add(partition)
+    return partitions
 
 
 @dataclass(frozen=True)
