@@ -5,9 +5,13 @@ import duckdb
 import typer
 from deltalake import DeltaTable, write_deltalake
 
+from lake_sandbox.reorg_pattern.delta.partition_manager import (
+    DeltaTableState,
+    check_skip_partition,
+    extract_partition_id,
+    get_table_info,
+)
 from lake_sandbox.reorg_pattern.delta.validation import (
-    get_delta_partitions,
-    validate_delta_table,
     verify_delta_streaming,
 )
 from lake_sandbox.reorg_pattern.reorganize.validation import update_stats
@@ -87,23 +91,20 @@ def convert_to_delta_lake(
     # Statistics tracking
     stats = {"total_chunks": len(chunk_dirs), "processed": 0, "skipped": 0, "failed": 0}
 
+    # Load Delta table state
+    table_state = DeltaTableState.from_path(delta_table_path)
+
     # Check if Delta table already exists
-    table_exists = False
-    existing_partitions = set()
-
-    if delta_table_path.exists() and not force:
-        is_valid, dt, error = validate_delta_table(delta_table_path)
-
-        if is_valid and dt is not None:
-            version = dt.version()
-            file_count = len(dt.files())
+    if not force and table_state.exists:
+        table_info = get_table_info(table_state)
+        if table_info:
+            version, file_count = table_info
             typer.echo(f"✓ Delta table exists (version {version}, {file_count} files)")
-            table_exists = True
-
-            existing_partitions = get_delta_partitions(dt)
-            typer.echo(f"Found {len(existing_partitions)} existing partitions")
+            typer.echo(
+                f"Found {len(table_state.existing_partitions)} existing partitions"
+            )
         else:
-            typer.echo(f"⚠ {error}, recreating...")
+            typer.echo("⚠ Delta table exists but could not get info, recreating...")
 
     # Process each chunk and stream to Delta table
     first_chunk = True
@@ -119,19 +120,19 @@ def convert_to_delta_lake(
             continue
 
         # Skip if partition already exists and not forcing
-        partition_id = chunk_name.split("=")[1]
-        if table_exists and not force and partition_id in existing_partitions:
-            typer.echo(f"  ✓ Skipping {chunk_name} - partition already exists")
-            update_stats(stats, {"skipped": 1})
+        should_skip, skip_stats = check_skip_partition(table_state, chunk_name, force)
+        if should_skip:
+            update_stats(stats, skip_stats)
             continue
 
         try:
             # Read and deduplicate the parquet data
             # Add parcel_chunk column and remove duplicates
+            partition_id = extract_partition_id(chunk_name)
             df = conn.execute(f"""
                 SELECT
                     DISTINCT ON (parcel_id, date) *,
-                    '{chunk_name.split("=")[1]}' as parcel_chunk
+                    '{partition_id}' as parcel_chunk
                 FROM read_parquet('{data_file}')
                 ORDER BY parcel_id, date
             """).fetchdf()
@@ -143,7 +144,9 @@ def convert_to_delta_lake(
 
             # Determine write mode for this chunk
             if first_chunk:
-                write_mode: Literal["overwrite", "append"] = "overwrite" if not table_exists or force else "append"
+                write_mode: Literal["overwrite", "append"] = (
+                    "overwrite" if not table_state.exists or force else "append"
+                )
                 first_chunk = False
             else:
                 write_mode = "append"

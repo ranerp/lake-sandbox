@@ -53,36 +53,6 @@ def get_delta_partitions(dt: DeltaTable) -> set[str]:
     return partitions
 
 
-def check_existing_delta_partition(
-    delta_table_path: Path, partition: str, force: bool = False
-) -> tuple[bool, dict[str, int]]:
-    """Check if a Delta partition already exists and should be skipped.
-
-    Args:
-        delta_table_path: Path to the Delta table
-        partition: Partition identifier to check
-        force: Whether to force recreation regardless of existing state
-
-    Returns:
-        Tuple of (should_skip, stats_update)
-    """
-    if force:
-        return False, {}
-
-    is_valid, dt, error = validate_delta_table(delta_table_path)
-    if not is_valid or dt is None:
-        return False, {}
-
-    existing_partitions = get_delta_partitions(dt)
-    partition_name = f"parcel_chunk={partition}"
-
-    if partition in existing_partitions:
-        typer.echo(f"  ✓ Skipping {partition_name} - partition already exists")
-        return True, {"skipped": 1}
-
-    return False, {}
-
-
 def verify_delta_streaming(
     chunk_name: str, records_streamed: int, delta_table_path: Path
 ) -> dict[str, int]:
