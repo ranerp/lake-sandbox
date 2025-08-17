@@ -3,6 +3,7 @@ import typer
 from lake_sandbox.examples.duckdb_analysis import analyze_data
 from lake_sandbox.examples.query_parcel import query_parcel
 from lake_sandbox.examples.query_sample import query_sample
+from lake_sandbox.examples.analyze_partitioning import analyze_partitioning
 from lake_sandbox.pipeline.main_pipeline import run_pipeline_cli
 from lake_sandbox.reorg_pattern.reorganization import reorg
 from lake_sandbox.streaming_assembly.assembly import streaming_assembly
@@ -32,6 +33,9 @@ app.command("query-parcel",
 app.command("query-sample",
             help="Query random parcels within a random time window from Delta Lake data")(
     query_sample)
+app.command("analyze-partitioning",
+            help="Analyze Delta Lake partitioning performance and efficiency")(
+    analyze_partitioning)
 
 
 def main() -> None:
